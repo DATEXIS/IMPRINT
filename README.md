@@ -1,6 +1,6 @@
 # Robust Weight Imprinting
 This repository contains code for the paper **Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation**.
-[[Preprint]([www.google.de](https://arxiv.org/abs/2503.14572))]
+[[Preprint](https://arxiv.org/abs/2503.14572)]
 
 March 2025: Code published upon acceptance.
 
