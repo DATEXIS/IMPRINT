@@ -11,7 +11,7 @@ The final output of the test data in `T` is computed by an aggregation (`AGG`) m
 Embeddings and generated weights are normalized according to `NORMpre` and `NORMpost`, respectively.
 During inference, embeddings are normalized according to `NORMinf` (not shown here).
 
-<img src="framework_overview.svg" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
+<img src="images/framework_overview.svg" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
 
 In the paper, we investigate the impact and benefits of each component.
 
@@ -27,12 +27,12 @@ Previously studied imprinting strategies are special cases within our framework.
 The framework enables the creation of a novel configuration ("Ours") that outperforms previous work across `FMs` and `Ts`by a large margin with statistical significance.
 It uses multiple proxies per class. Here, $k=20$ is chosen.
 
-| Paper                                              | `NORMpre` | `GEN` | `NORMpost` | `NORMinf` | `AGG`| Avg. acc. %  |
-|----------------------------------------------------|---------|---------|----------|---------|-------|--------------|
-| [Qi et al.]([https://example.com/qi](https://openaccess.thecvf.com/content_cvpr_2018/html/Qi_Low-Shot_Learning_With_CVPR_2018_paper.html))   | L2      | mean    | L2       | L2      | max   | 87.72        |
-| [Hosoda et al.]([https://example.com/hos](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2024.1344114/full)) | none    | mean    | quantile | none    | max   | 82.15        |
-| [Janson et al.]([https://example.com/](https://arxiv.org/abs/2210.04428)) | none    | mean    | none     | none    | 1-nn  | 87.65        |
-| **Ours**                                           | L2      | k-means | L2       | L2      | max   | **91.47**    |
+| Paper                                                                                                                                      | `NORMpre` | `GEN`   | `NORMpost` | `NORMinf` | `AGG` | Avg. acc. % |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | --------- | ------- | ---------- | --------- | ----- | ----------- |
+| [Qi et al.]([https://example.com/qi](https://openaccess.thecvf.com/content_cvpr_2018/html/Qi_Low-Shot_Learning_With_CVPR_2018_paper.html)) | L2        | mean    | L2         | L2        | max   | 87.72       |
+| [Hosoda et al.]([https://example.com/hos](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2024.1344114/full))     | none      | mean    | quantile   | none      | max   | 82.15       |
+| [Janson et al.]([https://example.com/](https://arxiv.org/abs/2210.04428))                                                                  | none      | mean    | none       | none      | 1-nn  | 87.65       |
+| **Ours**                                                                                                                                   | L2        | k-means | L2         | L2        | max   | **91.47**   |
 
 
 ### Connection to Neural Collapse
@@ -42,4 +42,4 @@ In all four plots, peaks in accuracy at $k=d$ can be inferred.
 Accuracies of the tasks containing all of `MNIST`, `FashionMNIST`, and `CIFAR-10` at once are shown in dotted lines and show that using one proxy (the `mean`) is not optimal, as the `FM` seems to not be fully collapsed on these OOD classes.
 This confirms the connection between the effect of using multiple proxies and the collapse of the data.
 
-<img src="var_num_proxies_vs_datasets.svg" alt="Effect of multi-proxy imprinting on different datasets as presented in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="600">
+<img src="images/var_num_proxies_vs_datasets.svg" alt="Effect of multi-proxy imprinting on different datasets as presented in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="600">

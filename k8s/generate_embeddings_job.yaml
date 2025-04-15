@@ -1,0 +1,86 @@
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-embeddings
+spec:
+    spec:
+      priorityClassName: normal
+      containers:
+        - name: imprinting
+          image: registry.datexis.com/jwesterhoff/imprinting@sha256:d7df133f94de16f565440d2e03c86b940ac13586d1a775f36819927e298cdf02
+          command: ["python", "generate_embeddings.py"]
+          env:
+            - name: LANG
+              value: 'C.UTF-8'
+            - name: PYTHONUNBUFFERED
+              value: '1'
+            - name: KAGGLE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: kaggle-username
+                  key: KAGGLE_USERNAME
+            - name: KAGGLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kaggle-key
+                  key: KAGGLE_KEY
+            - name: IMAGENET_URL_DEVKIT_T_1_2
+              valueFrom:
+                secretKeyRef:
+                  name: imagenet-url-devkit-t-1-2
+                  key: IMAGENET_URL_DEVKIT_T_1_2
+            - name: IMAGENET_URL_TRAIN_T_1_2
+              valueFrom:
+                secretKeyRef:
+                  name: imagenet-url-train-t-1-2
+                  key: IMAGENET_URL_TRAIN_T_1_2
+            - name: IMAGENET_URL_VAL_T_ALL
+              valueFrom:
+                secretKeyRef:
+                  name: imagenet-url-val-t-all
+                  key: IMAGENET_URL_VAL_T_ALL
+          resources:
+            requests:
+              cpu: "8"
+            limits:
+              nvidia.com/gpu: "1" # not sure if even 0 would work here
+              memory: "64Gi"
+          volumeMounts:
+            - name: imprinting-pvc
+              mountPath: /data
+          volumeMounts:
+            - name: imagenet-data-pvc
+              mountPath: /imagenet_data
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: gpu
+                    operator: In
+                    values:
+                      # - p100
+                      # - k80
+                      # - v100
+                      - a100
+                  # - key: cpuclass
+                  #   operator: In
+                  #   values:
+                  #     - epyc
+      volumes:
+        - name: imprinting-pvc
+          persistentVolumeClaim:
+            claimName: imprinting-pvc
+        - name: imagenet-data-pvc
+          persistentVolumeClaim:
+            claimName: imagenet-data-pvc
+      imagePullSecrets:
+        - name: private-registry-auth
+      restartPolicy: Never
+
+# NOTES:
+# - To set the above secret keys and have them available in python env, do, e.g.,
+#   `kubectl create secret generic kaggle-key --from-literal=KAGGLE_KEY='123'
+# - tqdm and k9s: Run `kubectl attach <pod-name>` to see the progress of the job
+#   nicely in the terminal (works well with tqdm unlike `kubectl log`)

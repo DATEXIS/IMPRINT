@@ -1,0 +1,80 @@
+{
+    "seeds": [
+        17121997,
+        123987,
+        12412312
+    ],
+    # "seeds": [14057, 994348, 23092007, 123456, 98765],
+    # Whether and how to normalize the input data (that is, the embeddings)
+    "normalize_input_data": [
+        "none",
+        "l2"
+    ],
+    # Whether and how to normalize the input data (that is, the embeddings)
+    #  before the process of selecting the proxies.
+    "normalize_for_proxy_selection": [
+        "none",
+        "l2"
+    ],
+    "normalize_layer_activations": [
+        "none"
+    ],
+    "presampling_methods": [
+        "all",
+        "weibull",
+    ],
+    "presampling_quantiles_values": [
+        [0, 1.0],
+        [0.05, 0.95],
+        [0.1, 0.9],
+    ],
+    "presampling_fewshot_values": [
+        -1, # represents all
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+        200,
+        400,
+        600,
+        800,
+        1000,
+    ],
+    "proxy_methods": [
+        "all",
+        "random",
+        "mean",
+        "lmeans",
+        "lmedoids",
+        "fps",
+        "cov_max",
+    ],
+    "nums_proxies": [
+        -1,
+        1,
+        2,
+        3,
+        5,
+        10,
+        20,
+        50,
+        100,
+        200,
+        500,
+    ],
+    "normalize_weights": [
+        "none",
+        "l2",
+        "quantile",
+    ],
+    "aggregation_methods": [
+        "max",
+        "knn",
+    ],
+    "k_values": [
+        -1, 1, 3, 5, 20, 50,
+    ]
+}

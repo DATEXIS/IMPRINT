@@ -1,0 +1,130 @@
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ app_name|lower() }}-{{ backbone_name|lower|replace('_', '-') }}-{{ dataset_name1|lower }}-{% if dataset_name2 %}{{ dataset_name2|lower }}-{% endif %}combs-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
+  labels:
+    app: imprinting
+spec:
+  template:
+    metadata:
+      labels:
+        app: imprinting
+    spec:
+      priorityClassName: normal
+      containers:
+        - name: imprinting
+          image: registry.datexis.com/jwesterhoff/imprinting@{{ docker_tag}}
+          command: ["python", "main.py",
+                    "--data_and_res_dir", "data",
+                    "--results_dir", "{{ results_dir }}",
+                    "--backbone_name", "{{ backbone_name }}",
+                    "--dataset_name", "{{ dataset_name1 }}", {% if dataset_name2 %}"{{ dataset_name2 }}",{% endif %}
+                    "--label_mapping", "{{ label_mapping }}",
+                    {% for task_split in task_splits -%}
+                    "--task_splits", {% for label in task_split %}"{{ label }}", {% endfor %}
+                    {% endfor -%}
+                    "--combinations_slice", "{{ combinations_slice[0] }}", "{{ combinations_slice[1] }}",
+                    "--use_wandb", "{{ use_wandb }}",
+                    "--vis", "{{ vis }}",
+                    "--parallel_threads", "{{ parallel_threads }}",
+                    "--torch_threads", "{{ torch_threads }}",
+                    "--use_cache", "{{ use_cache }}",
+                    "--device_name", "{{ device_name }}",
+                    "--overwrite", "{{ overwrite }}",
+                    "--config_path", "{{ config_path }}"
+                    ]
+          env:
+          - name: LANG
+            value: 'C.UTF-8'
+          - name: PYTHONUNBUFFERED
+            value: '1'
+          - name: WANDB_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: wandb-api
+                key: WANDB_API_KEY
+          - name: KAGGLE_USERNAME # actually, this should not be needed here... -> fix scripts
+            valueFrom:
+              secretKeyRef:
+                name: kaggle-username
+                key: KAGGLE_USERNAME
+          - name: KAGGLE_KEY # actually, this should not be needed here... -> fix scripts
+            valueFrom:
+              secretKeyRef:
+                name: kaggle-key
+                key: KAGGLE_KEY
+          volumeMounts:
+            - name: imprinting-pvc
+              mountPath: /data
+            {%if use_cache %}
+            - mountPath: /dev/shm
+              name: dshm
+            {% endif %}
+{% if device_name == 'cpu' %}
+          resources:
+            requests:
+              cpu: "{{ cpu_request }}"
+              memory: "{{ memory_request }}"
+            limits:
+              cpu: "{{ cpu_limit}}"
+              memory: "{{ memory_limit }}"
+{% elif device_name == 'cuda' %}
+          resources:
+            requests:
+              cpu: "1"
+            limits:
+              nvidia.com/gpu: "1"
+              memory: "64Gi"
+      {# nodeSelector:
+        gpu: {{ gpu_node_selector }}
+        #kubernetes.io/hostname: cl-worker22 #}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: gpu
+                    operator: In
+                    values:
+                      {% for value in gpu_node_selector -%}
+                      - {{ value }}
+                      {% endfor %}
+
+                  {# - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - cl-worker22
+                      - cl-worker23
+                      - cl-worker29 #}
+{% endif %}
+      volumes:
+        - name: imprinting-pvc
+          persistentVolumeClaim:
+            claimName: imprinting-pvc
+        {%if use_cache %}
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: {{ shared_memory_limit }}
+        {% endif %}
+      imagePullSecrets:
+        - name: private-registry-auth
+      restartPolicy: Never
+
+
+# NOTE: "Everything that needs to be persistent** should be written onto a PVC!"
+# For resource selection, check https://docs.cluster.ris.bht-berlin.de/user/selection/
+# To get insights about it directly in the terminal:
+#   `kubectl top pod <pod_name>`
+# Just like for the tool pod, you can now do
+#  `kubectl apply -f imprinting.yaml`
+#  `kubectl exec -it imprinting -- bash` (once a pod for this job has spawned
+#     (maybe have to look for the precise pod name then!))
+# and check things in k9s
+# NOTE that you can delete jobs using `kubectl delete job imprinting-job`
+#  OR simply kubectl delete jobs --all
+
+# NOTE: To find out how many CPUs the node actually got, run
+# kubectl describe nodes | grep cpu: --before-context 2
+
