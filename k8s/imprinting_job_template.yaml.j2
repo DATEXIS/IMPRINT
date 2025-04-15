@@ -15,9 +15,10 @@ spec:
       containers:
         - name: imprinting
           image: registry.datexis.com/jwesterhoff/imprinting@{{ docker_tag}}
-          command: ["python", "main.py",
+          command: ["python", "scripts/run_experiments.py",
                     "--data_and_res_dir", "data",
                     "--results_dir", "{{ results_dir }}",
+                    "--config_path", "{{ config_path }}"
                     "--backbone_name", "{{ backbone_name }}",
                     "--dataset_name", "{{ dataset_name1 }}", {% if dataset_name2 %}"{{ dataset_name2 }}",{% endif %}
                     "--label_mapping", "{{ label_mapping }}",
@@ -32,7 +33,6 @@ spec:
                     "--use_cache", "{{ use_cache }}",
                     "--device_name", "{{ device_name }}",
                     "--overwrite", "{{ overwrite }}",
-                    "--config_path", "{{ config_path }}"
                     ]
           env:
           - name: LANG
