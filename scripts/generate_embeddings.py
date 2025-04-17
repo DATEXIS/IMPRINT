@@ -41,10 +41,12 @@ def main():
     """
     # Set datasets
     datasets_list = available_datasets
+    # datasets_list = ["MNIST"]
     # Set backbones
     backbones_list = available_backbones
+    # backbones_list = ["resnet18"]
 
-    device_name = "cuda"
+    device_name = "cuda"  # "cpu"
     batch_size = 64
 
     class_focus = {
@@ -70,7 +72,11 @@ def main():
     ]
 
     for dataset_name in datasets_list:
-        raw_data_root = "imagenet_data" if dataset_name == "ImageNet" else "data"
+        raw_data_root = (
+            "imagenet-data" if dataset_name == "ImageNet" else "imprinting-reproduce"
+        )
+        # raw_data_root = "data"
+
         embedding_root = raw_data_root
         for backbone_idx, backbone_name in enumerate(backbones_list):
             for train in [False, True]:  # [True, False]:
