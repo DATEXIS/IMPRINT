@@ -110,7 +110,8 @@ class DatasetHandler:
         self.load_dataset()
 
     def load_dataset(self):
-        transform = self.get_image_transformation()
+
+        print("INFO: Setting up datasets folder.")
 
         if self.dataset_name in torch_datasets:
             if not self.data_downloaded:
@@ -129,8 +130,19 @@ class DatasetHandler:
                 train=self.train,
                 download=True,
             )
+        elif self.dataset_name == "ImageNet":
+            dataset_path = self.download_from_imagenet(
+                self.raw_data_path, split=self.train_str
+            )
+            dataset = datasets.ImageNet(root=dataset_path, split=self.train_str)
+        else:
+            raise ValueError(
+                f"Dataset {self.dataset_name} ({self.train_str}) is not available. "
+                f"Choose one from {available_datasets}"
+            )
 
         print("INFO: Setting up DataLoader...")
+        transform = self.get_image_transformation()
 
         def collate_fn(batch):
             return (
