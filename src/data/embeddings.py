@@ -159,31 +159,6 @@ class EmbeddingExtractor:
             # validation set here.
             self.train_str = "val"
 
-        # Handle ImageNet class name to index translation
-        self.imagenet_class_name_idx_translator = {}
-        if self.dataset_name == "ImageNet":
-            # Load class-index translator from imagenet_class_translations.csv
-            df = pd.read_csv("imagenet_class_translations.csv", sep=";")
-            self.imagenet_class_name_idx_translator = dict(
-                zip(
-                    df["class_name"],
-                    df["class_id"],
-                )
-            )
-            if self.class_focus is not None:
-                # Translate the given class names to class indices and drop
-                # duplicates
-                self.class_focus = [
-                    self.imagenet_class_name_idx_translator[class_name]
-                    for class_name in self.class_focus
-                    if isinstance(class_name, str)
-                ] + [
-                    class_idx
-                    for class_idx in self.class_focus
-                    if isinstance(class_idx, int)
-                ]
-                self.class_focus = list(set(self.class_focus))
-
         # Setup embedding file paths
         self.embeddings_path, embeddings_filename = get_embeddings_path(
             self.embedding_root, self.dataset_name, self.backbone_name, self.train
