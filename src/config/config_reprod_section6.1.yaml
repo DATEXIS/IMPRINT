@@ -1,0 +1,74 @@
+{
+    "backbones": ["resnet18", "vit_b_16"],
+    "datasets": ["MNIST", "FashionMNIST", "CIFAR10"],
+    "label_remappings": {
+        "none": {}
+    },
+    "task_splits": {
+        "all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
+        "even": [[0, 2, 4, 6, 8]],
+        "odd": [[1, 3, 5, 7, 9]],
+        "short": [[0, 1, 2]]
+    },
+    "seeds": [
+        17121997,
+        123987,
+        12412312
+    ],
+    "normalize_input_data": [
+        "none",
+        "l2"
+    ],
+    "normalize_for_proxy_selection": [
+        "none",
+        "l2"
+    ],
+    "normalize_layer_activations": [
+        "none",
+        "l2",
+    ],
+    "presampling_methods": [
+        "all",
+    ],
+    "presampling_quantiles_values": [
+        [0, 1.0],
+    ],
+    "presampling_fewshot_values": [
+        -1,
+    ],
+    "proxy_methods": [
+        "kmeans",
+        "kmedoids",
+        "mean",
+        "cov_max",
+        "random",
+        "fps",
+        "all"
+    ],
+    "nums_proxies": [
+        -1,
+        1,
+        2,
+        3,
+        5,
+        10,
+        20
+    ],
+    "normalize_weights": [
+        "none",
+        "l2",
+        "quantile"
+    ],
+    "aggregation_methods": [
+        "max",
+        "mnn"
+    ],
+    "k_values": [
+        -1,
+        1,
+        3,
+        5,
+        20,
+        50
+    ]
+}
