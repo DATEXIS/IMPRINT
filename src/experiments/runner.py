@@ -387,7 +387,7 @@ def run_combination(
         normalize_layer_activations=combination["normalize_layer_activations"],
         normalize_weights=combination["normalize_weights"],
         aggregation_method=combination["aggregation_method"],
-        k_value=combination["k_value"],
+        m_value=combination["m_value"],
         embedding_size=embedding_size,
     ).to(device)
 
@@ -464,7 +464,7 @@ def run_combination(
             "tasks_seen": task_idx + 1,
             "task_desc": task_desc,
             "num_proxies": combination["num_proxies"],
-            "k_value": combination["k_value"],
+            "m_value": combination["m_value"],
         }
 
         # Map test labels to model's internal class indices

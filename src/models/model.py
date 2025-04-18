@@ -31,7 +31,7 @@ class ImprintedModel(nn.Module):
         normalize_layer_activations: str = "topk",
         normalize_weights: str = "l2",
         aggregation_method: str = "mean",
-        k_value: int = 5,  # for kNN
+        m_value: int = 5,  # for m-nearest neighbors
         embedding_size: int = 512,
     ):
         """
@@ -44,8 +44,8 @@ class ImprintedModel(nn.Module):
             normalize_weights: Normalization method for weights
                               ("none", "l2", "quantile")
             aggregation_method: Method for aggregating activations
-                               ("max", "knn")
-            k_value: Number of nearest neighbors for kNN aggregation
+                               ("max", "mnn")
+            m_value: Number of nearest neighbors for mNN aggregation
             embedding_size: Size of the feature embeddings
         """
         super().__init__()
@@ -55,7 +55,7 @@ class ImprintedModel(nn.Module):
         self.normalize_layer_activations = normalize_layer_activations
         self.normalize_weights = normalize_weights
         self.aggregation_method = aggregation_method
-        self.k_value = k_value
+        self.m_value = m_value
 
         self.w1s = nn.ParameterList()
 
@@ -170,13 +170,13 @@ class ImprintedModel(nn.Module):
     def aggregate_activations(self, activations, data):
         """
         Aggregate activations using the specified method.
-        Note that, if the aggregation method is "knn", only the provided
+        Note that, if the aggregation method is "mnn", only the provided
         data is used; the layer activations are not used. This also
-        means the layer activations are irrelevant to the knn aggregation.
+        means the layer activations are irrelevant to the mnn aggregation.
 
         Args:
             activations: Layer activations to aggregate
-            data: Original input data (used for kNN aggregation)
+            data: Original input data (used for mNN aggregation)
 
         Returns:
             torch.Tensor: Aggregated class scores
@@ -186,8 +186,8 @@ class ImprintedModel(nn.Module):
         """
         y = torch.zeros((self.num_classes, activations.shape[-1]), device=data.device)
 
-        if self.aggregation_method == "knn":
-            y = self.knn_aggregation(data)
+        if self.aggregation_method == "mnn":
+            y = self.mnn_aggregation(data)
         else:
             lens = [len(w1) for w1 in self.w1s]
             start = 0
@@ -207,38 +207,38 @@ class ImprintedModel(nn.Module):
 
         return y
 
-    def knn_aggregation(self, data):
+    def mnn_aggregation(self, data):
         """
-        Aggregate activations using K-Nearest Neighbors.
+        Aggregate activations using m-Nearest Neighbors.
 
-        This method uses the kNN algorithm to classify input data directly based on
+        This method uses the mNN algorithm to classify input data directly based on
         the imprinted weight vectors, bypassing the intermediate layer activations.
 
         Args:
             data: Input feature embeddings
 
         Returns:
-            torch.Tensor: Classification scores based on kNN voting
+            torch.Tensor: Classification scores based on mNN voting
         """
-        # Convert to numpy for sklearn KNN
+        # Convert to numpy
         w1 = torch.vstack([*self.w1s]).cpu()
         all_class_weights_np = w1.numpy()
         data_np = data.cpu().numpy()
 
         # Ensure k is not greater than the number of class weights
-        knn_k = min(all_class_weights_np.shape[0], self.k_value)
-        if knn_k != self.k_value:
+        m = min(all_class_weights_np.shape[0], self.m_value)
+        if m != self.m_value:
             print(
-                f"Warning: k_value was set to {self.k_value}, but only {knn_k} "
-                f"class weights are available. Using k={knn_k} for knn "
+                f"Warning: m_value was set to {self.m_value}, but only {m} "
+                f"class weights are available. Using k={m} for mnn "
                 "aggregation instead."
             )
 
-        # Fit KNN on the class weights
-        knn = NearestNeighbors(n_neighbors=knn_k, algorithm="auto").fit(
+        # Fit mNN on the class weights
+        mnn = NearestNeighbors(n_neighbors=m, algorithm="auto").fit(
             all_class_weights_np
         )
-        distances, indices = knn.kneighbors(data_np)
+        distances, indices = mnn.kneighbors(data_np)
 
         # Get the number of proxies per class
         num_proxies_per_class = [
@@ -249,7 +249,7 @@ class ImprintedModel(nn.Module):
         )
 
         # Map indices to class labels based on the proxy ranges
-        knn_labels = torch.tensor(
+        mnn_labels = torch.tensor(
             [
                 [
                     next(
@@ -270,7 +270,7 @@ class ImprintedModel(nn.Module):
         distances = torch.tensor(distances)
         predicted_labels = torch.tensor(
             [
-                knn_labels[_i]
+                mnn_labels[_i]
                 .bincount(weights=1 / (distances[_i] + 1e-10))
                 .argmax()
                 .item()

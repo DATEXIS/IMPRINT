@@ -60,7 +60,7 @@
     "aggregation_methods": [
         "max",
     ],
-    "k_values": [
+    "m_values": [
         -1,
     ]
 }

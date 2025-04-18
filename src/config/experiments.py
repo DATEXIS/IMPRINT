@@ -40,7 +40,7 @@ def generate_combinations(config):
     nums_proxies = config.get("nums_proxies", [20])
     normalize_weights = config.get("normalize_weights", ["l2"])
     aggregation_methods = config.get("aggregation_methods", ["max"])
-    k_values = config.get("k_values", [-1])
+    m_values = config.get("m_values", [-1])
 
     # Set up all the configurations
     base_configurations = list(
@@ -56,7 +56,7 @@ def generate_combinations(config):
                 "num_proxies": nums_proxies,
                 "normalize_weights": normalize_weights,
                 "aggregation_method": aggregation_methods,
-                "k_value": k_values,
+                "m_value": m_values,
             }
         )
     )
@@ -115,10 +115,10 @@ def filter_configurations(df):
         DataFrame: Filtered configurations
     """
     # "mean" and "max" aggregation is independent of k; the k is only for kNN
-    df.loc[df["aggregation_method"].isin(["mean", "max"]), "k_value"] = -1
+    df.loc[df["aggregation_method"].isin(["mean", "max"]), "m_value"] = -1
 
     # Remove rows where k is -1 for "knn" aggregation
-    df = df[~((df["aggregation_method"] == "knn") & (df["k_value"] == -1))]
+    df = df[~((df["aggregation_method"] == "knn") & (df["m_value"] == -1))]
 
     # "knn" aggregation is independent of layer activation normalization
     df = df[
@@ -128,9 +128,9 @@ def filter_configurations(df):
         )
     ]
 
-    # The k_value cannot be greater than the number of proxies
+    # The m_value cannot be greater than the number of proxies
     df.loc[
-        (df["k_value"] > df["num_proxies"]) & (df["num_proxies"] > 0), "k_value"
+        (df["m_value"] > df["num_proxies"]) & (df["num_proxies"] > 0), "m_value"
     ] = df["num_proxies"]
 
     # "all" presampling is independent of quantile
