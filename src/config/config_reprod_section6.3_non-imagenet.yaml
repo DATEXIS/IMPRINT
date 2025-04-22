@@ -1,6 +1,6 @@
 {
     "backbones": ["resnet18", "vit_b_16", "resnet50", "swin_b"],
-    "datasets": ["MNIST", "FashionMNIST", "CIFAR10"],
+    "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
     "label_remappings": {
         "none": {},
     },
@@ -34,7 +34,7 @@
     "proxy_methods": [
         "kmeans"
     ],
-    "nums_proxies": [
+    "ks": [
         1,
         2,
         3,
@@ -57,7 +57,7 @@
     "aggregation_methods": [
         "max"
     ],
-    "m_values": [
+    "ms": [
         -1,
     ]
 }

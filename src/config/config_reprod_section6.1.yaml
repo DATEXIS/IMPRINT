@@ -1,6 +1,6 @@
 {
     "backbones": ["resnet18", "vit_b_16"],
-    "datasets": ["MNIST", "FashionMNIST", "CIFAR10"],
+    "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
     "label_remappings": {
         "none": {}
     },
@@ -45,7 +45,7 @@
         "fps",
         "all"
     ],
-    "nums_proxies": [
+    "ks": [
         -1,
         1,
         2,
@@ -63,7 +63,7 @@
         "max",
         "mnn"
     ],
-    "m_values": [
+    "ms": [
         -1,
         1,
         3,

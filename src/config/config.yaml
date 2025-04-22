@@ -1,61 +1,44 @@
 {
-    "backbones": ["resnet18", "vit_b_16", "resnet50", "swin_b"],
-    "datasets": [["ImageNet"]],
+    "backbones": ["resnet18"],
+    "datasets": [["MNIST"]],
     "label_remappings": {
-        "RANDOM_CLASS_REMAPPINGS": {}, # will be filled in by the script
+        "none": {}
     },
     "task_splits": {
-        "all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
+        "short": [[0, 1, 2]]
     },
     "seeds": [
         17121997,
-        123987,
-        12412312
     ],
     "normalize_input_data": [
         "l2"
     ],
     "normalize_for_proxy_selection": [
         "none",
-        "l2"
     ],
     "normalize_layer_activations": [
-        "l2"
+        "l2",
     ],
     "presampling_methods": [
-        "all"
+        "all",
     ],
     "presampling_quantiles_values": [
-        [0, 1.0]
+        [0, 1.0],
     ],
     "presampling_fewshot_values": [
-        -1
+        -1,
     ],
     "proxy_methods": [
-        "kmeans"
+        "kmeans",
     ],
     "ks": [
-        1,
-        2,
         3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15
     ],
     "normalize_weights": [
-        "l2"
+        "l2",
     ],
     "aggregation_methods": [
-        "max"
+        "max",
     ],
     "ms": [
         -1,
