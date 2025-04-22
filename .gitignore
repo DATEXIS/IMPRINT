@@ -1,6 +1,9 @@
 # Custom
+data/results_temp
+data/results
 data/embeddings
 data/raw
+old_data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
