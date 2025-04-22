@@ -196,10 +196,10 @@ def calc_weighted_f1_score(f1s):
 
 def load_config(config_path="src/config/config.yaml"):
     """
-    Load configuration from YAML file with support for special references.
+    Load configuration from YAML file.
 
-    This function loads the YAML configuration and resolves special references
-    to predefined variables like RANDOM_TASKS and RANDOM_CLASS_REMAPPINGS.
+    This function loads the YAML configuration and replaces special references
+    like RANDOM_CLASS_REMAPPINGS with the actual mappings.
 
     Args:
         config_path: Path to the configuration file
@@ -218,9 +218,32 @@ def load_config(config_path="src/config/config.yaml"):
                     line = line.split("#")[0]
                 content += line
 
-            config = yaml.safe_load(content)
+        config = yaml.safe_load(content)
 
-            return config
+        # Check if we need to process RANDOM_CLASS_REMAPPINGS
+        if (
+            "label_remappings" in config
+            and "RANDOM_CLASS_REMAPPINGS" in config["label_remappings"]
+        ):
+            from src.experiments.imagenet.prep import RANDOM_CLASS_REMAPPINGS
+
+            # Create a new label_remappings dictionary
+            new_label_remappings = {}
+
+            # Copy existing mappings except RANDOM_CLASS_REMAPPINGS placeholder
+            for key, value in config["label_remappings"].items():
+                if key != "RANDOM_CLASS_REMAPPINGS":
+                    new_label_remappings[key] = value
+
+            # Add all the map{i}-{j} keys directly to the dictionary
+            for i, mappings in RANDOM_CLASS_REMAPPINGS.items():
+                for j, mapping in enumerate(mappings):
+                    new_label_remappings[f"map{i}-{j}"] = mapping
+
+            # Replace the original label_remappings with the expanded version
+            config["label_remappings"] = new_label_remappings
+
+        return config
     except Exception as e:
         print(f"Error loading configuration from {config_path}: {e}")
         return {}

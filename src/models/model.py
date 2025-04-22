@@ -31,7 +31,7 @@ class ImprintedModel(nn.Module):
         normalize_layer_activations: str = "topk",
         normalize_weights: str = "l2",
         aggregation_method: str = "mean",
-        m_value: int = 5,  # for m-nearest neighbors
+        m: int = 5,  # for m-nearest neighbors
         embedding_size: int = 512,
     ):
         """
@@ -45,7 +45,7 @@ class ImprintedModel(nn.Module):
                               ("none", "l2", "quantile")
             aggregation_method: Method for aggregating activations
                                ("max", "mnn")
-            m_value: Number of nearest neighbors for mNN aggregation
+            m: Number of nearest neighbors for mNN aggregation
             embedding_size: Size of the feature embeddings
         """
         super().__init__()
@@ -55,7 +55,7 @@ class ImprintedModel(nn.Module):
         self.normalize_layer_activations = normalize_layer_activations
         self.normalize_weights = normalize_weights
         self.aggregation_method = aggregation_method
-        self.m_value = m_value
+        self.m = m
 
         self.w1s = nn.ParameterList()
 
@@ -226,10 +226,10 @@ class ImprintedModel(nn.Module):
         data_np = data.cpu().numpy()
 
         # Ensure k is not greater than the number of class weights
-        m = min(all_class_weights_np.shape[0], self.m_value)
-        if m != self.m_value:
+        m = min(all_class_weights_np.shape[0], self.m)
+        if m != self.m:
             print(
-                f"Warning: m_value was set to {self.m_value}, but only {m} "
+                f"Warning: m was set to {self.m}, but only {m} "
                 f"class weights are available. Using k={m} for mnn "
                 "aggregation instead."
             )

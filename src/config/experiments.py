@@ -10,7 +10,15 @@ import pandas as pd
 from sklearn.model_selection import ParameterGrid
 
 
-def generate_combinations(config):
+def generate_combinations(
+    config,
+    backbone_name="resnet18",
+    dataset_name=["MNIST"],
+    mapping_name="none",
+    mapping={},
+    task_name="short",
+    task_splits=[[0, 1, 2]],
+):
     """
     Generate experiment configurations from a base configuration.
 
@@ -19,7 +27,13 @@ def generate_combinations(config):
     to remove invalid or redundant configurations.
 
     Args:
-        config (dict): Base configuration dictionary containing parameter ranges
+        config (dict): Base configuration dictionary containing imprinting parameters
+        backbone_name (str): Name of the backbone model to use (default: "resnet18")
+        dataset_name (str): Name of the dataset to use (default: ["MNIST"])
+        mapping_name (str): Name of the label mapping to use (default: "none")
+        mapping (dict): Dictionary defining label mapping transformations (default: {})
+        task_name (str): Name identifier for the task (default: "short")
+        task_splits (list): List of task splits, where each split is a list of class indices (default: [[0, 1, 2]])
 
     Returns:
         list: List of experiment configuration dictionaries
@@ -37,15 +51,21 @@ def generate_combinations(config):
     )
     presampling_fewshot_values = config.get("presampling_fewshot_values", [-1])
     proxy_methods = config.get("proxy_methods", ["lmeans"])
-    nums_proxies = config.get("nums_proxies", [20])
+    ks = config.get("ks", [20])
     normalize_weights = config.get("normalize_weights", ["l2"])
     aggregation_methods = config.get("aggregation_methods", ["max"])
-    m_values = config.get("m_values", [-1])
+    ms = config.get("ms", [-1])
 
     # Set up all the configurations
     base_configurations = list(
         ParameterGrid(
             {
+                "backbone_name": [backbone_name],
+                "dataset_name": [dataset_name],
+                "mapping_name": [mapping_name],
+                "mapping": [mapping],
+                "task_name": [task_name],
+                "task_splits": [task_splits],
                 "normalize_input_data": normalize_input_data,
                 "normalize_for_proxy_selection": normalize_for_proxy_selection,
                 "normalize_layer_activations": normalize_layer_activations,
@@ -53,10 +73,10 @@ def generate_combinations(config):
                 "presampling_quantiles_value": presampling_quantiles_values,
                 "presampling_fewshot_value": presampling_fewshot_values,
                 "proxy_method": proxy_methods,
-                "num_proxies": nums_proxies,
+                "k": ks,
                 "normalize_weights": normalize_weights,
                 "aggregation_method": aggregation_methods,
-                "m_value": m_values,
+                "m": ms,
             }
         )
     )
@@ -71,11 +91,11 @@ def generate_combinations(config):
     )
 
     # Apply filtering to remove redundant or invalid configurations
-    filtered_df = filter_configurations(df)
+    filtered_df = filter_combinations(df)
 
     print(
-        "[INFO] Number of configurations per backbone, dataset, and task "
-        "(disregarding seed) after filtering:",
+        "[INFO] Number of configurations per backbone, dataset, mapping and "
+        "task (disregarding seed) after filtering:",
         len(filtered_df),
     )
 
@@ -101,7 +121,7 @@ def generate_combinations(config):
     return final_configurations
 
 
-def filter_configurations(df):
+def filter_combinations(df):
     """
     Filter experiment configurations to remove redundant or invalid combinations.
 
@@ -114,24 +134,22 @@ def filter_configurations(df):
     Returns:
         DataFrame: Filtered configurations
     """
-    # "mean" and "max" aggregation is independent of k; the k is only for kNN
-    df.loc[df["aggregation_method"].isin(["mean", "max"]), "m_value"] = -1
+    # "max" aggregation is independent of m; the m is only for mNN
+    df.loc[df["aggregation_method"] == "max", "m"] = -1
 
-    # Remove rows where k is -1 for "knn" aggregation
-    df = df[~((df["aggregation_method"] == "knn") & (df["m_value"] == -1))]
+    # Remove rows where m is -1 for "mnn" aggregation
+    df = df[~((df["aggregation_method"] == "mnn") & (df["m"] == -1))]
 
-    # "knn" aggregation is independent of layer activation normalization
+    # "mnn" aggregation is independent of layer activation normalization
     df = df[
         ~(
-            (df["aggregation_method"] == "knn")
+            (df["aggregation_method"] == "mnn")
             & (df["normalize_layer_activations"] != "none")
         )
     ]
 
-    # The m_value cannot be greater than the number of proxies
-    df.loc[
-        (df["m_value"] > df["num_proxies"]) & (df["num_proxies"] > 0), "m_value"
-    ] = df["num_proxies"]
+    # The m cannot be greater than the number of proxies
+    df.loc[(df["m"] > df["k"]) & (df["k"] > 0), "m"] = df["k"]
 
     # "all" presampling is independent of quantile
     df.loc[df["presampling_method"] == "all", "presampling_quantiles_value"] = df.loc[
@@ -147,10 +165,10 @@ def filter_configurations(df):
     ]
 
     # "mean" proxy method can only choose one proxy
-    df.loc[df["proxy_method"].isin(["beta", "mean"]), "num_proxies"] = 1
+    df.loc[df["proxy_method"].isin(["beta", "mean"]), "k"] = 1
 
     # Proxy method "all" means choosing all proxies
-    df.loc[df["proxy_method"] == "all", "num_proxies"] = -1
+    df.loc[df["proxy_method"] == "all", "k"] = -1
 
     # Remove those rows where "normalize_for_proxy_selection" is not "none"
     #  and "normalize_input_data" is not the same as "normalize_for_proxy_selection"

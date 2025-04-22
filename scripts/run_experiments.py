@@ -43,11 +43,12 @@ def main():
             "data_and_res_dir": "data",
             "backbone_name": "resnet18",
             "dataset_name": ["MNIST"],
-            "label_mapping": {},
+            "mapping_name": "none",
+            "mapping": {},
+            "task_name": "short",
             "task_splits": [[0, 1, 2]],
-            "combinations_slice": [0, 99999999],
+            "combinations_slice": [0, 100],
             "use_wandb": False,
-            "vis": False,
             "parallel_threads": 1,
             "torch_threads": 4,
             "use_cache": True,
@@ -73,38 +74,115 @@ def main():
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
-    # Check if embeddings exist for the datasets
-    for dataset in args["dataset_name"]:
-        embeddings_path = os.path.join(
-            args["data_and_res_dir"], "embeddings", dataset, args["backbone_name"]
-        )
-        if not os.path.exists(embeddings_path):
-            print(
-                f"WARNING: Embeddings for {dataset} with {args['backbone_name']} "
-                f"backbone not found at {embeddings_path}"
-            )
+    # Load the configuration
+    config = load_config(args["config_path"])
 
-    # Get actual experiment configuration
-    combinations = generate_combinations(load_config(args["config_path"]))
-
-    # Apply combination slice if specified
-    slice_start, slice_end = args["combinations_slice"]
-    combinations_to_run = combinations[slice_start:slice_end]
-
-    print(f"Running {len(combinations_to_run)} of {len(combinations)} combinations")
-
-    # Execute experiment combinations
-    run_combinations(
-        combinations_to_run,
-        data_dir=args["data_and_res_dir"],
-        res_dir=res_dir,
-        use_wandb=args["use_wandb"],
-        parallel_threads=args["parallel_threads"],
-        torch_threads=args["torch_threads"],
-        use_cache=args["use_cache"],
-        device_name=args["device_name"],
-        overwrite=args["overwrite"],
+    # Extract configuration elements
+    backbones = config.get("backbones", ["resnet18"])
+    datasets = config.get("datasets", [["MNIST"]])
+    remappings_dict = config.get("label_remappings", {"none": {}})
+    task_splits_dict = config.get(
+        "task_splits", {"all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]}
     )
+
+    # Overwrite with CLI arguments
+    if "backbone_name" in args:
+        backbones = [args["backbone_name"]]
+    if "dataset_name" in args:
+        datasets = [args["dataset_name"]]
+    if "mapping_name" in args and "mapping" in args:
+        remappings_dict = {args["mapping_name"]: args["mapping"]}
+    elif "mapping_name" in args or "mapping" in args:
+        raise ValueError("Both mapping_name and mapping must be provided together.")
+    if "task_name" in args and "task_splits" in args:
+        task_splits_dict = {args["task_name"]: args["task_splits"]}
+    elif "task_name" in args or "task_splits" in args:
+        raise ValueError("Both task_name and task_splits must be provided together.")
+
+    # Create all combinations of backbone, dataset, label_remapping, and task_splits
+    data_combinations = []
+    for backbone in backbones:
+        for dataset in datasets:
+            for mapping_name, mapping in remappings_dict.items():
+                for ts_name, ts_list in task_splits_dict.items():
+                    # Skip map-style remappings for non-ImageNet datasets
+                    if dataset != "ImageNet" and mapping_name.startswith("map"):
+                        continue
+
+                    data_combinations.append(
+                        {
+                            "backbone": backbone,
+                            "dataset": dataset,
+                            "task_name": ts_name,
+                            "task_splits": ts_list,
+                            "mapping_name": mapping_name,
+                            "mapping": mapping,
+                        }
+                    )
+
+    print(f"Created {len(data_combinations)} data combinations")
+
+    # Run each data combination
+    for idx, exp_combo in enumerate(data_combinations):
+        backbone = exp_combo["backbone"]
+        dataset = exp_combo["dataset"]
+        task_name = exp_combo["task_name"]
+        task_splits = exp_combo["task_splits"]
+        mapping_name = exp_combo["mapping_name"]
+        mapping = exp_combo["mapping"]
+
+        print(
+            f"Running experiment {idx+1}/{len(data_combinations)}: "
+            f"backbone={backbone}, dataset={dataset}, "
+            f"task_split={task_name}, label_mapping={mapping_name}"
+        )
+
+        # Check if embeddings exist for the desired data
+        # Remember that dataset is a list which could also contain multiple
+        #  dataset building blocks (e.g., MNIST and FashionMNIST could be
+        #  combined into one new dataset using mappings and/or task_splits).
+        for name in dataset:
+            embeddings_path = os.path.join(
+                args["data_and_res_dir"], "embeddings", name, backbone
+            )
+            if not os.path.exists(embeddings_path):
+                print(
+                    f"WARNING: Embeddings for {name} with {backbone} "
+                    f"backbone not found at {embeddings_path}"
+                )
+
+        # Generate combinations for this specific configuration
+        combinations = generate_combinations(
+            config,
+            backbone_name=backbone,
+            dataset_name=dataset,
+            mapping_name=mapping_name,
+            mapping=mapping,
+            task_name=task_name,
+            task_splits=task_splits,
+        )
+
+        # Apply combination slice if specified
+        slice_start, slice_end = args["combinations_slice"]
+        combinations_to_run = combinations[slice_start:slice_end]
+
+        print(
+            f"Running {len(combinations_to_run)} of {len(combinations)} "
+            "combinations."
+        )
+
+        # Execute experiment combinations for this specific configuration
+        run_combinations(
+            combinations_to_run,
+            data_dir=args["data_and_res_dir"],
+            res_dir=res_dir,
+            use_wandb=args["use_wandb"],
+            parallel_threads=args["parallel_threads"],
+            torch_threads=args["torch_threads"],
+            use_cache=args["use_cache"],
+            device_name=args["device_name"],
+            overwrite=args["overwrite"],
+        )
 
 
 def parse_input():
@@ -134,7 +212,6 @@ def parse_input():
         type=str,
         help="Results directory (subfolder in data_and_res_dir for storing results)",
     )
-
     # Experiment configuration arguments
     parser.add_argument(
         "--b",
@@ -152,11 +229,25 @@ def parse_input():
         help="Dataset(s) to use (single or pair). Options: MNIST, FashionMNIST, CIFAR10, ImageNet",
     )
     parser.add_argument(
-        "--lm",
-        "--label_mapping",
+        "--mn",
+        "--mapping_name",
+        default="none",
+        type=str,
+        help="Label mapping name (e.g., 'none', 'map0-1', ...)",
+    )
+    parser.add_argument(
+        "--m",
+        "--mapping",
         default="{}",
         type=str,
         help="Label mapping as dictionary string (e.g., '{0:0, 1:0, 2:1, 3:1}')",
+    )
+    parser.add_argument(
+        "--tn",
+        "--task_name",
+        default="short",
+        type=str,
+        help="Task name for task splits (e.g., 'short', 'all')",
     )
     parser.add_argument(
         "--t",
@@ -182,12 +273,6 @@ def parse_input():
         default=False,
         type=lambda x: x.lower() == "true",
         help="Whether to use Weights and Biases for logging",
-    )
-    parser.add_argument(
-        "--vis",
-        default=False,
-        type=lambda x: x.lower() == "true",
-        help="Whether to generate and save visualizations",
     )
     parser.add_argument(
         "--pt",

@@ -319,9 +319,9 @@ def run_combination(
         overwrite: Whether to overwrite existing results
         combination: The experiment configuration to run
     """
-    # Check for kNN aggregation and adjust device if needed
-    if combination["aggregation_method"] == "knn" and device != torch.device("cpu"):
-        print("\t[WARN] Falling back to CPU because of kNN aggregation.")
+    # Check for mNN aggregation and adjust device if needed
+    if combination["aggregation_method"] == "mnn" and device != torch.device("cpu"):
+        print("\t[WARN] Falling back to CPU because of mNN aggregation.")
         device = torch.device("cpu")
         if continual_loader.use_cache:
             continual_loader.to(device)
@@ -355,7 +355,7 @@ def run_combination(
         torch.set_num_threads(torch_threads)
 
     # Create a readable description of the label mapping
-    label_mapping_desc = generate_label_mapping_desc(combination["label_mapping"])
+    label_mapping_desc = generate_label_mapping_desc(combination["mapping"])
 
     # Initialize wandb logging if enabled
     if use_wandb:
@@ -387,7 +387,7 @@ def run_combination(
         normalize_layer_activations=combination["normalize_layer_activations"],
         normalize_weights=combination["normalize_weights"],
         aggregation_method=combination["aggregation_method"],
-        m_value=combination["m_value"],
+        m=combination["m"],
         embedding_size=embedding_size,
     ).to(device)
 
@@ -445,7 +445,7 @@ def run_combination(
             # Select proxies from the filtered data
             task_proxies = select_proxies(
                 filtered_task_data,
-                num_proxies=combination["num_proxies"],
+                k=combination["k"],
                 method=combination["proxy_method"],
                 seed=combination["seed"],
             ).to(device)
@@ -463,8 +463,8 @@ def run_combination(
         wandb_log_dict = {
             "tasks_seen": task_idx + 1,
             "task_desc": task_desc,
-            "num_proxies": combination["num_proxies"],
-            "m_value": combination["m_value"],
+            "k": combination["k"],
+            "m": combination["m"],
         }
 
         # Map test labels to model's internal class indices
@@ -568,7 +568,7 @@ def check_combinations(combinations: list):
     """
     backbone_name = combinations[0]["backbone_name"]
     dataset_name = combinations[0]["dataset_name"]
-    label_mapping = combinations[0]["label_mapping"]
+    label_mapping = combinations[0]["mapping"]
     task_splits = combinations[0]["task_splits"]
 
     for _comb in combinations:
@@ -579,7 +579,7 @@ def check_combinations(combinations: list):
             _comb["dataset_name"] == dataset_name
         ), "All combinations must be on the same dataset!"
         assert (
-            _comb["label_mapping"] == label_mapping
+            _comb["mapping"] == label_mapping
         ), "All combinations must have the same label mapping!"
         assert (
             _comb["task_splits"] == task_splits
