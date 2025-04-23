@@ -42,6 +42,7 @@ def main():
     # Set datasets
     datasets_list = available_datasets
     # datasets_list = ["MNIST"]
+
     # Set backbones
     backbones_list = available_backbones
     # backbones_list = ["resnet18"]
