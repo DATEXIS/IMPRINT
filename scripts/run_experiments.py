@@ -223,10 +223,11 @@ def parse_input():
     parser.add_argument(
         "--ds",
         "--dataset_name",
-        default=["CIFAR10"],
+        default=["MNIST"],
         type=str,
         nargs="+",
-        help="Dataset(s) to use (single or pair). Options: MNIST, FashionMNIST, CIFAR10, ImageNet",
+        help="Dataset(s) to use (single or pair). Options: MNIST, FashionMNIST, CIFAR10, ImageNet "
+        "(or combinations of those).",
     )
     parser.add_argument(
         "--mn",
@@ -320,14 +321,15 @@ def parse_input():
     args = parser.parse_args()
 
     # Process and validate arguments
+    # Parse dataset name from string to list
     dataset_name = args.ds
-    if not 1 <= len(dataset_name) <= 2:
+    if not isinstance(dataset_name, list) and not 1 <= len(dataset_name) <= 2:
         raise ValueError("Only single dataset or pair of datasets is supported")
 
     # Parse label mapping from string to dictionary
     try:
-        label_mapping = literal_eval(args.lm)
-        if not isinstance(label_mapping, dict):
+        mapping = literal_eval(args.m)
+        if not isinstance(mapping, dict):
             raise ValueError
     except:
         raise ValueError("Label mapping must be a valid Python dictionary string")
@@ -349,12 +351,12 @@ def parse_input():
         "results_dir": args.r,
         "backbone_name": args.b,
         "dataset_name": dataset_name,
-        "label_mapping": label_mapping,
+        "mapping_name": args.mn,
+        "mapping": mapping,
+        "task_name": args.tn,
         "task_splits": task_splits,
-        "calc_and_save_cl_accuracies": args.cl,
         "combinations_slice": combinations_slice,
         "use_wandb": args.w,
-        "vis": args.vis,
         "parallel_threads": args.pt,
         "torch_threads": args.tt,
         "use_cache": args.uc,
