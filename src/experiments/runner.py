@@ -326,7 +326,7 @@ def run_combination(
         if continual_loader.use_cache:
             continual_loader.to(device)
 
-    # Set random seed for reproducibility
+    # Set random seed for reproducibility including deterministic CUDNN behavior
     set_all_seeds(combination["seed"])
 
     # Generate unique ID for this combination

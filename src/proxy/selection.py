@@ -15,8 +15,7 @@ Available methods include:
 """
 
 import torch
-from torch.nn.functional import cosine_similarity
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.cluster import KMeans
 from sklearn_extra.cluster import KMedoids
 
 

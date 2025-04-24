@@ -124,6 +124,7 @@ class EmbeddingExtractor:
         raw_data_root="./data",
         embedding_root="./data",
         train=True,
+        seed=42,
     ):
         """
         Initialize an embedding extractor.
@@ -137,6 +138,7 @@ class EmbeddingExtractor:
             raw_data_root: Root directory for raw data
             embedding_root: Root directory for storing embeddings
             train: Whether to embed training (True) or test set (False)
+            seed: Random seed for reproducibility
         """
         self.device_name = device_name
         if self.device_name == "cuda" and torch.cuda.is_available():
@@ -153,6 +155,7 @@ class EmbeddingExtractor:
         self.raw_data_root = raw_data_root
         self.embedding_root = embedding_root
         self.train = train
+        self.seed = seed
         self.train_str = "train" if train else "test"
         if self.dataset_name == "ImageNet" and not self.train:
             # For ImageNet, there is no test set. So we have to use the
@@ -209,13 +212,14 @@ class EmbeddingExtractor:
                 self.backbone_name, device_name=self.device_name
             ).backbone
 
-        # # Get raw data (download if necessary) by initializing the dataset handler
+        # Get raw data (download if necessary) by initializing the dataset handler
         self.dataset_handler = DatasetHandler(
             self.dataset_name,
             self.backbone_name,
             root=self.raw_data_root,
             train=self.train,
             batch_size=self.batch_size,
+            seed=self.seed,
         )
 
     def extract_embeddings(self):

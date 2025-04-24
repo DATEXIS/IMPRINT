@@ -29,6 +29,7 @@ from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms
 
 from src.models.backbone import backbone_weights
+from src.utils.helpers import set_all_seeds
 
 load_dotenv()
 
@@ -68,6 +69,7 @@ class DatasetHandler:
         train: bool = False,
         batch_size: int = 64,
         split_ratio: float = 0.8,
+        seed: int = 42,
     ):
         """
         Initialize a dataset handler.
@@ -79,6 +81,7 @@ class DatasetHandler:
             train: Whether to load training set (True) or test set (False)
             batch_size: Batch size for the DataLoader
             split_ratio: Ratio to split the dataset into training and test sets
+            seed: Random seed for reproducibility
         """
 
         self.data_loader = None
@@ -88,6 +91,7 @@ class DatasetHandler:
         self.train = train
         self.batch_size = batch_size
         self.split_ratio = split_ratio
+        self.seed = seed  # Store the seed for use in data loading
 
         self.train_str = "train" if self.train else "test"
         if self.dataset_name == "ImageNet" and not self.train:
@@ -150,10 +154,20 @@ class DatasetHandler:
                 torch.tensor([label for _, label in batch]),
             )
 
+        # Use the provided seed
+        set_all_seeds(self.seed)
+
+        # Create a worker initialization function that uses set_all_seeds
+        def seed_worker(worker_id):
+            set_all_seeds(self.seed)
+
         self.data_loader = DataLoader(
             dataset=dataset,
             batch_size=self.batch_size,
             shuffle=self.train,
+            # Set worker_init_fn to ensure deterministic behavior across workers
+            worker_init_fn=seed_worker,
+            # Uncomment these if needed for your setup:
             # num_workers=4,  # Number of CPU threads for loading data
             # pin_memory=True,  # Enable pinned memory for faster GPU transfers
             collate_fn=collate_fn,
@@ -316,6 +330,9 @@ class DatasetHandler:
         self,
         dataset_path,
     ):
+        # Set seed before random operations to ensure reproducibility
+        set_all_seeds(self.seed)
+
         class_folders = os.listdir(dataset_path)
 
         train_path = os.path.join(dataset_path, "train")
@@ -330,6 +347,7 @@ class DatasetHandler:
             if os.path.isdir(class_folder_path):
                 images = os.listdir(class_folder_path)
                 num_images = len(images)
+                # This operation depends on PyTorch's random state
                 shuffled_indices = torch.randperm(num_images).tolist()
                 split_idx = int(num_images * self.split_ratio)
 

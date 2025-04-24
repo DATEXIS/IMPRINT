@@ -20,6 +20,8 @@ def set_all_seeds(seed: int):
 
     This function sets the seeds for Python's random module, NumPy, PyTorch,
     PyTorch CUDA, and Python's hash seed to ensure reproducible results.
+    It also sets deterministic mode for cudnn which may affect performance
+    but ensures reproducibility across hardware platforms.
 
     Args:
         seed: Integer seed value to use
@@ -30,6 +32,11 @@ def set_all_seeds(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     os.environ["PYTHONHASHSEED"] = str(seed)
+
+    # Additional settings for reproducibility across hardware
+    # These may impact performance but are necessary for consistent results
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 
 def quantile_norm(x, ref_dist, regularity="discrete"):
