@@ -2,32 +2,33 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ app_name|lower() }}-{{ backbone_name|lower|replace('_', '-') }}-{{ dataset_name1|lower }}-{% if dataset_name2 %}{{ dataset_name2|lower }}-{% endif %}combs-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
+  name: {{ app_name|lower() }}-{{ backbone_name|lower|replace('_', '-') }}-{{ dataset_name_str|lower }}-{{ mapping_name|lower|replace('_', '-') }}-{{ task_name|lower|replace('_', '-') }}-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
   labels:
-    app: imprinting
+    app: multi-imprinting
 spec:
   template:
     metadata:
       labels:
-        app: imprinting
+        app: multi-imprinting
     spec:
       priorityClassName: normal
       containers:
-        - name: imprinting
-          image: registry.datexis.com/jwesterhoff/imprinting@{{ docker_tag}}
+        - name: multi-imprinting
+          image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
           command: ["python", "scripts/run_experiments.py",
-                    "--data_and_res_dir", "data",
+                    "--data_and_res_dir", "/app/imprinting-reproduce",
                     "--results_dir", "{{ results_dir }}",
-                    "--config_path", "{{ config_path }}"
+                    "--config", "{{ config_path }}",
                     "--backbone_name", "{{ backbone_name }}",
-                    "--dataset_name", "{{ dataset_name1 }}", {% if dataset_name2 %}"{{ dataset_name2 }}",{% endif %}
-                    "--label_mapping", "{{ label_mapping }}",
+                    "--dataset_name", {% for ds in dataset_name %}"{{ ds }}", {% endfor %}
+                    "--mapping_name", "{{ mapping_name }}",
+                    "--mapping", "{{ mapping }}",
+                    "--task_name", "{{ task_name }}",
                     {% for task_split in task_splits -%}
                     "--task_splits", {% for label in task_split %}"{{ label }}", {% endfor %}
                     {% endfor -%}
                     "--combinations_slice", "{{ combinations_slice[0] }}", "{{ combinations_slice[1] }}",
                     "--use_wandb", "{{ use_wandb }}",
-                    "--vis", "{{ vis }}",
                     "--parallel_threads", "{{ parallel_threads }}",
                     "--torch_threads", "{{ torch_threads }}",
                     "--use_cache", "{{ use_cache }}",
@@ -55,8 +56,8 @@ spec:
                 name: kaggle-key
                 key: KAGGLE_KEY
           volumeMounts:
-            - name: imprinting-pvc
-              mountPath: /data
+            - name: imprinting-reproduce-pvc
+              mountPath: /app/imprinting-reproduce
             {%if use_cache %}
             - mountPath: /dev/shm
               name: dshm
@@ -99,9 +100,9 @@ spec:
                       - cl-worker29 #}
 {% endif %}
       volumes:
-        - name: imprinting-pvc
+        - name: imprinting-reproduce-pvc
           persistentVolumeClaim:
-            claimName: imprinting-pvc
+            claimName: imprinting-reproduce-pvc
         {%if use_cache %}
         - name: dshm
           emptyDir:
@@ -111,20 +112,4 @@ spec:
       imagePullSecrets:
         - name: private-registry-auth
       restartPolicy: Never
-
-
-# NOTE: "Everything that needs to be persistent** should be written onto a PVC!"
-# For resource selection, check https://docs.cluster.ris.bht-berlin.de/user/selection/
-# To get insights about it directly in the terminal:
-#   `kubectl top pod <pod_name>`
-# Just like for the tool pod, you can now do
-#  `kubectl apply -f imprinting.yaml`
-#  `kubectl exec -it imprinting -- bash` (once a pod for this job has spawned
-#     (maybe have to look for the precise pod name then!))
-# and check things in k9s
-# NOTE that you can delete jobs using `kubectl delete job imprinting-job`
-#  OR simply kubectl delete jobs --all
-
-# NOTE: To find out how many CPUs the node actually got, run
-# kubectl describe nodes | grep cpu: --before-context 2
-
+  backoffLimit: 1
