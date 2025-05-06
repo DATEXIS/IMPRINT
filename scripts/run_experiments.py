@@ -25,7 +25,6 @@ simplefilter(action="ignore", category=DeprecationWarning)
 from src.experiments.runner import run_combinations
 from src.config.experiments import generate_combinations
 from src.utils.helpers import load_config
-from src.experiments.imagenet.prep import RANDOM_TASKS, RANDOM_CLASS_REMAPPINGS
 
 
 def main():
