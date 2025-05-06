@@ -28,7 +28,6 @@ class ImprintedModel(nn.Module):
     def __init__(
         self,
         normalize_input_data: str = "l2",
-        normalize_layer_activations: str = "topk",
         normalize_weights: str = "l2",
         aggregation_method: str = "mean",
         m: int = 5,  # for m-nearest neighbors
@@ -39,8 +38,6 @@ class ImprintedModel(nn.Module):
 
         Args:
             normalize_input_data: Normalization method for input data ("none", "l2")
-            normalize_layer_activations: Normalization method for layer activations
-                                         ("none", "l2", "topk")
             normalize_weights: Normalization method for weights
                               ("none", "l2", "quantile")
             aggregation_method: Method for aggregating activations
@@ -52,7 +49,6 @@ class ImprintedModel(nn.Module):
         self.embedding_size = embedding_size
         self.num_classes = 0  # model starts off empty with 0 classes
         self.normalize_input_data = normalize_input_data
-        self.normalize_layer_activations = normalize_layer_activations
         self.normalize_weights = normalize_weights
         self.aggregation_method = aggregation_method
         self.m = m
@@ -106,8 +102,6 @@ class ImprintedModel(nn.Module):
         w1 = torch.vstack([*self.w1s])
         x = w1 @ data.T
 
-        x = self.normalize(x, "layer_activations")
-
         # Aggregate activations using the specified method
         y = self.aggregate_activations(x, data)
 
@@ -119,7 +113,7 @@ class ImprintedModel(nn.Module):
 
         Args:
             data: Data to normalize
-            origin: Data origin ("input_data", "layer_activations", "weights")
+            origin: Data origin ("input_data", "weights")
             ref_dist: Reference distribution for quantile normalization
 
         Returns:
@@ -128,7 +122,7 @@ class ImprintedModel(nn.Module):
         Raises:
             ValueError: If unknown normalization method is specified
         """
-        assert origin in ["input_data", "layer_activations", "weights"]
+        assert origin in ["input_data", "weights"]
 
         if (normalization_type := getattr(self, f"normalize_{origin}")) == "none":
             return data
@@ -139,16 +133,6 @@ class ImprintedModel(nn.Module):
             else:
                 raise ValueError(
                     f"Unknown normalization type: {normalization_type} for normalizing input data."
-                )
-        elif origin == "layer_activations":
-            if normalization_type == "l2":
-                data = F.normalize(data, p=2, dim=0)
-            elif normalization_type == "topk":
-                threshold = safe_quantile_with_retry(data, 0.95, dim=0)
-                data[data < threshold] = 0
-            else:
-                raise ValueError(
-                    f"Unknown normalization type: {normalization_type} for normalizing layer activations."
                 )
         elif origin == "weights":
             if normalization_type == "l2":

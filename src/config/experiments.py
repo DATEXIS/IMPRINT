@@ -44,7 +44,6 @@ def generate_combinations(
     normalize_for_proxy_selection = config.get(
         "normalize_for_proxy_selection", ["none"]
     )
-    normalize_layer_activations = config.get("normalize_layer_activations", ["none"])
     presampling_methods = config.get("presampling_methods", ["all"])
     presampling_quantiles_values = config.get(
         "presampling_quantiles_values", [(0, 1.0)]
@@ -68,7 +67,6 @@ def generate_combinations(
                 "task_splits": [task_splits],
                 "normalize_input_data": normalize_input_data,
                 "normalize_for_proxy_selection": normalize_for_proxy_selection,
-                "normalize_layer_activations": normalize_layer_activations,
                 "presampling_method": presampling_methods,
                 "presampling_quantiles_value": presampling_quantiles_values,
                 "presampling_fewshot_value": presampling_fewshot_values,
@@ -140,14 +138,6 @@ def filter_combinations(df):
     # Remove rows where m is -1 for "mnn" aggregation
     df = df[~((df["aggregation_method"] == "mnn") & (df["m"] == -1))]
 
-    # "mnn" aggregation is independent of layer activation normalization
-    df = df[
-        ~(
-            (df["aggregation_method"] == "mnn")
-            & (df["normalize_layer_activations"] != "none")
-        )
-    ]
-
     # The m cannot be greater than the number of proxies
     df.loc[(df["m"] > df["k"]) & (df["k"] > 0), "m"] = df["k"]
 
@@ -178,6 +168,14 @@ def filter_combinations(df):
             & (df["normalize_input_data"] != df["normalize_for_proxy_selection"])
         )
     ]
+
+    # k can not be greater than selected few shots (or rather, if that happened,
+    #  then these runs are the same)
+    df.loc[
+        (df["presampling_fewshot_value"] != -1)
+        & (df["presampling_fewshot_value"] < df["k"]),
+        "k",
+    ] = df["presampling_fewshot_value"]
 
     # Remove duplicate configurations (after applying rules)
     df = df.loc[df.astype(str).drop_duplicates().index]

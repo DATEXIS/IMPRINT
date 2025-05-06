@@ -384,7 +384,6 @@ def run_combination(
     # Initialize the model
     model = ImprintedModel(
         normalize_input_data=combination["normalize_input_data"],
-        normalize_layer_activations=combination["normalize_layer_activations"],
         normalize_weights=combination["normalize_weights"],
         aggregation_method=combination["aggregation_method"],
         m=combination["m"],

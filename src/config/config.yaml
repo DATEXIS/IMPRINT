@@ -16,9 +16,6 @@
     "normalize_for_proxy_selection": [
         "none",
     ],
-    "normalize_layer_activations": [
-        "l2",
-    ],
     "presampling_methods": [
         "all",
     ],

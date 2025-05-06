@@ -19,9 +19,6 @@
         "none",
         "l2"
     ],
-    "normalize_layer_activations": [
-        "l2"
-    ],
     "presampling_methods": [
         "all"
     ],
