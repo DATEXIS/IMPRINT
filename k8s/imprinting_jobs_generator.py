@@ -226,8 +226,8 @@ def generate_jobs(
 results_dir = (
     "reprod"  # Will be used for results_dir and in dir name of generated jobs
 )
-app_name_suffix = "6-3-im"
-config_path = "src/config/config_reprod_sec6.3_imagenet.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
+app_name_suffix = "fig6"
+config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
 
 clear_existing_jobs = True
 use_wandb = False
@@ -238,7 +238,7 @@ overwrite_json_files = False  # Whether existing json files should be overwritte
 device_name = "cpu"
 
 max_number_of_jobs = (
-    400  # Set this higher than the expected number of data combinations
+    50  # Set this higher than the expected number of data combinations
 )
 # Machine requirements per job
 cpu_request = 8
