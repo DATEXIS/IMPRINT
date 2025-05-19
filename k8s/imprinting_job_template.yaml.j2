@@ -15,7 +15,7 @@ spec:
       containers:
         - name: multi-imprinting
           image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
-          command: ["python", "scripts/run_experiments.py",
+          command: ["python", "scripts/run_imprinting_experiments.py",
                     "--data_and_res_dir", "/app/imprinting-reproduce",
                     "--results_dir", "{{ results_dir }}",
                     "--config", "{{ config_path }}",
