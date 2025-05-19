@@ -43,7 +43,6 @@
     ],
     "proxy_methods": [
         "kmeans",
-        "all",
     ],
     "ks": [
         -1,
