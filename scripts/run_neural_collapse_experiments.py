@@ -1,0 +1,235 @@
+import os
+import numpy as np
+import torch
+import pandas as pd
+from sklearn.model_selection import ParameterGrid
+
+from src.data.datasets import EmbeddingDataset
+from src.data.embeddings import get_embeddings_path
+from src.nc.neural_collapse import NeuralCollapse
+from src.experiments.imagenet.prep import RANDOM_CLASS_REMAPPINGS
+
+
+def main():
+    """
+    Run neural collapse experiments focusing only on NC1 metric.
+    Calculates and saves NC1 values for different backbone models and datasets,
+    including random label remappings for ImageNet.
+    """
+    # Set up the paths and configuration
+    print("Setting up paths and configuration")
+    root = "./data"
+    nc_dir = "./analysis/nc_results"
+    torch.set_num_threads(4)
+
+    # Create output directory if it doesn't exist
+    if not os.path.exists(nc_dir):
+        os.makedirs(nc_dir)
+
+    # Define parameter combinations for standard datasets (no remapping needed)
+    standard_parameters = {
+        "dataset_name": ["MNIST", "FashionMNIST", "CIFAR10"],
+        "backbone_name": ["resnet18", "resnet50", "vit_b_16", "swin_b"],
+    }
+
+    # Process standard datasets
+    process_standard_datasets(standard_parameters, root, nc_dir)
+
+    # Process ImageNet with label remappings
+    process_imagenet_with_remapping(root, nc_dir)
+
+    print("\nAll neural collapse experiments completed!")
+
+
+def process_standard_datasets(parameters, root, nc_dir):
+    """
+    Process standard datasets without remapping.
+    For MNIST, FashionMNIST, and CIFAR10, we use all classes (0-9) as is.
+    """
+    print("\n=== Processing standard datasets (MNIST, FashionMNIST, CIFAR10) ===")
+    print("Note: Using standard class assignments (0-9) for these datasets")
+
+    # Generate all combinations of parameters
+    combinations = list(ParameterGrid(parameters))
+
+    # Store all results
+    results = {
+        "dataset": [],
+        "backbone": [],
+        "nc_1": [],
+    }
+
+    # Process each combination
+    for idx, combination in enumerate(combinations):
+        print(f"Running combination {idx+1}/{len(combinations)}")
+
+        dataset_name = combination["dataset_name"]
+        backbone = combination["backbone_name"]
+
+        try:
+            # Get embeddings path for the current combination
+            embeddings_path, embeddings_filename = get_embeddings_path(
+                root, dataset_name, backbone, train=True
+            )
+
+            # Load embeddings dataset - no label mapping needed for standard datasets
+            embeddings_file = os.path.join(embeddings_path, embeddings_filename)
+            if not os.path.exists(embeddings_file):
+                print(
+                    f"Skipping {dataset_name} with {backbone} - "
+                    f"embeddings file not found at {embeddings_file}"
+                )
+                continue
+
+            embeddings_dataset = EmbeddingDataset(embeddings_file)
+
+            # Extract embeddings and labels
+            embeddings = embeddings_dataset[:][0]
+            labels = embeddings_dataset[:][1]
+
+            # Filter out invalid labels if any
+            if -1 in labels:
+                wanted_labels = ~torch.isin(labels, torch.tensor([-1]))
+                embeddings = embeddings[wanted_labels]
+                labels = labels[wanted_labels]
+
+            # Apply normalization
+            embeddings = embeddings / (
+                torch.norm(embeddings, dim=1, keepdim=True)
+                + torch.finfo(embeddings.dtype).eps
+            )
+
+            # Calculate neural collapse metrics
+            print(f"Calculating NC1 for {dataset_name} with {backbone}")
+            nc = NeuralCollapse(embeddings, labels)
+            nc_1 = nc.nc_1()  # Let nc_1 calculate covariance internally
+
+            # Store results
+            results["dataset"].append(dataset_name)
+            results["backbone"].append(backbone)
+            results["nc_1"].append(nc_1)
+
+            print(f"Completed {dataset_name} with {backbone}: NC1 = {nc_1:.4f}")
+
+        except Exception as e:
+            print(f"Error processing {dataset_name} with {backbone}: {str(e)}")
+
+    # Create and save a DataFrame for standard dataset results
+    print("Saving summary of standard dataset results")
+    standard_df = pd.DataFrame(results)
+    standard_csv_path = os.path.join(nc_dir, "standard_nc1_results.csv")
+    standard_df.to_csv(standard_csv_path, index=False)
+    print(f"Standard dataset results saved to {standard_csv_path}")
+
+    # Print a summary table
+    print("\nNeural Collapse (NC1) Results Summary for Standard Datasets:")
+    print("=" * 50)
+    print(f"{'Dataset':<15} {'Backbone':<15} {'NC1':<10}")
+    print("-" * 50)
+    for i in range(len(results["dataset"])):
+        print(
+            f"{results['dataset'][i]:<15} {results['backbone'][i]:<15} {results['nc_1'][i]:<10.4f}"
+        )
+
+
+def process_imagenet_with_remapping(root, nc_dir):
+    """
+    Process ImageNet with various label remappings.
+    ImageNet uses 100 different random label remappings (10 configurations × 10 variations).
+    """
+    print("\n=== Processing ImageNet with 100 different label remappings ===")
+    print(
+        "Processing 10 configurations (1-10 classes per label) × 10 random variations each"
+    )
+
+    # Define backbones to test with ImageNet
+    backbones = ["resnet18", "resnet50", "vit_b_16", "swin_b"]
+
+    # Store all results for ImageNet
+    imagenet_results = {
+        "dataset": [],
+        "backbone": [],
+        "remapping": [],
+        "n_classes_per_label": [],
+        "remapping_index": [],
+        "nc_1": [],
+    }
+
+    # Process each backbone
+    for backbone in backbones:
+        # Get embeddings path for ImageNet
+        embeddings_path, embeddings_filename = get_embeddings_path(
+            root, "ImageNet", backbone, train=False  # Use validation set for ImageNet
+        )
+
+        # Load embeddings dataset
+        embeddings_file = os.path.join(embeddings_path, embeddings_filename)
+        if not os.path.exists(embeddings_file):
+            print(
+                f"Skipping ImageNet with {backbone} - embeddings file not found at {embeddings_file}"
+            )
+            continue
+
+        # Process each mapping configuration (1-10 classes per label)
+        for n_classes_per_label in range(1, 11):
+            print(
+                f"Processing ImageNet with {backbone}, {n_classes_per_label} classes per label"
+            )
+
+            # Process each random remapping variation (10 for each configuration)
+            for remapping_idx, label_mapping in enumerate(
+                RANDOM_CLASS_REMAPPINGS[n_classes_per_label]
+            ):
+                try:
+                    # Create remapping name in the format "d_in_1-k"
+                    remapping_name = f"{n_classes_per_label}_in_1-{remapping_idx}"
+
+                    # Load the embeddings with the current label mapping
+                    embeddings_dataset = EmbeddingDataset(
+                        embeddings_file, label_mapping=label_mapping
+                    )
+
+                    # Extract embeddings and labels
+                    embeddings = embeddings_dataset[:][0]
+                    labels = embeddings_dataset[:][1]
+
+                    # Filter out invalid labels
+                    wanted_labels = ~torch.isin(labels, torch.tensor([-1]))
+                    embeddings = embeddings[wanted_labels]
+                    labels = labels[wanted_labels]
+
+                    # Apply normalization
+                    embeddings = embeddings / (
+                        torch.norm(embeddings, dim=1, keepdim=True)
+                        + torch.finfo(embeddings.dtype).eps
+                    )
+
+                    # Calculate neural collapse metrics
+                    nc = NeuralCollapse(embeddings, labels)
+                    nc_1 = nc.nc_1()  # Let nc_1 calculate covariance internally
+
+                    # Store results
+                    imagenet_results["dataset"].append("ImageNet")
+                    imagenet_results["backbone"].append(backbone)
+                    imagenet_results["remapping"].append(remapping_name)
+                    imagenet_results["n_classes_per_label"].append(n_classes_per_label)
+                    imagenet_results["remapping_index"].append(remapping_idx)
+                    imagenet_results["nc_1"].append(nc_1)
+
+                    print(f"  Completed remapping {remapping_name}: NC1 = {nc_1:.4f}")
+
+                except Exception as e:
+                    print(
+                        f"  Error processing ImageNet with {backbone}, remapping {n_classes_per_label}_in_1-{remapping_idx}: {str(e)}"
+                    )
+
+    # Save detailed ImageNet results as CSV
+    print("Saving ImageNet remapping results to CSV")
+    imagenet_df = pd.DataFrame(imagenet_results)
+    imagenet_csv_path = os.path.join(nc_dir, "imagenet_nc1_results.csv")
+    imagenet_df.to_csv(imagenet_csv_path, index=False)
+    print(f"ImageNet detailed results saved to {imagenet_csv_path}")
+
+
+if __name__ == "__main__":
+    main()
