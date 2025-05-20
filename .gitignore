@@ -1,5 +1,9 @@
 # Custom
-analysis
+analysis/combined_preprocessed_results
+analysis/nc_results
+analysis/raw_results
+analysis/result_graphs
+analysis/result_tables
 k8s/generated_imprinting_jobs_reprod
 data/results_temp
 data/results
