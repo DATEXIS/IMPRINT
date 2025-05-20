@@ -226,8 +226,12 @@ def generate_jobs(
 results_dir = (
     "reprod"  # Will be used for results_dir and in dir name of generated jobs
 )
-app_name_suffix = "fig6"
-config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
+# app_name_suffix = "fig6"
+# app_name_suffix = "imagenet"
+app_name_suffix = "non-imagenet"
+# config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
+# config_path = "src/config/config_reprod_sec6.3_imagenet.yaml"
+config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
 
 clear_existing_jobs = True
 use_wandb = False
@@ -250,7 +254,7 @@ memory_request = "8Gi"
 memory_limit = "16Gi"
 use_cache = True  # shared memory stuff
 shared_memory_limit = (
-    "2Gi"  # easily suffices for everything except the vgg11_bn embeddings
+    "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
 )
 gpu_node_selector = None
 
