@@ -1,7 +1,9 @@
+analysis
 data
-old_data
-images
+docs
 k8s
+
+old_data
 
 docker-compose.yml
 Dockerfile
@@ -9,6 +11,7 @@ Dockerfile
 README.md
 CHANGELOG.md
 
+venv
 .vscode
 __pycache__
 .git

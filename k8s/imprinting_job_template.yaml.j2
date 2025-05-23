@@ -45,16 +45,6 @@ spec:
               secretKeyRef:
                 name: wandb-api
                 key: WANDB_API_KEY
-          - name: KAGGLE_USERNAME # actually, this should not be needed here... -> fix scripts
-            valueFrom:
-              secretKeyRef:
-                name: kaggle-username
-                key: KAGGLE_USERNAME
-          - name: KAGGLE_KEY # actually, this should not be needed here... -> fix scripts
-            valueFrom:
-              secretKeyRef:
-                name: kaggle-key
-                key: KAGGLE_KEY
           volumeMounts:
             - name: imprinting-reproduce-pvc
               mountPath: /app/imprinting-reproduce

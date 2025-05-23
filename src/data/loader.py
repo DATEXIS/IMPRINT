@@ -3,8 +3,7 @@ Dataset loading and management module.
 
 This module provides utilities for loading, downloading, and preprocessing
 various image datasets used in the weight imprinting framework. It handles
-dataset acquisition from different sources including PyTorch datasets,
-Kaggle, and custom URLs.
+dataset acquisition from different sources.
 
 The module supports automatic downloading, extraction, and validation of
 image data, ensuring consistency across different backbone models.
@@ -17,13 +16,11 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 
 
-import kaggle
 import pandas as pd
 import rasterio
 import requests
 import torch
 import torchvision.datasets as datasets
-import wild_time_data
 from rasterio import RasterioIOError
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms
@@ -54,8 +51,7 @@ class DatasetHandler:
 
     This class manages the entire data pipeline from downloading raw datasets
     to preparing them for embedding extraction. It supports various dataset
-    formats and sources, including PyTorch datasets, Kaggle datasets, and
-    custom URLs.
+    formats and sources.
 
     The handler applies appropriate transformations based on the selected
     backbone model and handles dataset splitting when needed.
@@ -242,38 +238,6 @@ class DatasetHandler:
             else:
                 # After extraction, check and clean images
                 self.check_and_clean_images(self.raw_data_path)
-
-        return dataset_path
-
-    def download_from_kaggle(self, dataset_name, dataset_path, split=False):
-        if self.data_downloaded:
-            print(
-                f"	{self.dataset_name} ({self.train_str}) raw dataset "
-                "already exists. Loading from disk..."
-            )
-            return dataset_path
-
-        if split:
-            dataset_path = os.path.join(self.root, "raw", self.dataset_name)
-
-        if not os.path.exists(dataset_path):
-            os.makedirs(dataset_path)
-
-        kaggle.api.authenticate()
-        print(f"	Downloading {self.dataset_name} from Kaggle...")
-        kaggle.api.dataset_download_files(
-            dataset_name, path=dataset_path, unzip=True, quiet=False
-        )
-        print(f"Downloaded {self.dataset_name} to {dataset_path}")
-
-        if split:
-            self.split_dataset(dataset_path)
-            dataset_path = os.path.join(
-                self.root, "raw", self.dataset_name, self.train_str
-            )
-        else:
-            # After extraction, check and clean images
-            self.check_and_clean_images(self.raw_data_path)
 
         return dataset_path
 
