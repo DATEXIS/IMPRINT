@@ -8,10 +8,13 @@ the weight imprinting framework, representing class prototypes.
 Available methods include:
 - Random selection
 - Mean embedding
+- Least-Squares embeddings (as derived in [1])
 - k-means clustering
 - k-medoids clustering
 - Farthest point sampling
 - Covariance-based methods
+
+[1] https://arxiv.org/abs/2503.06385
 """
 
 import torch
@@ -27,8 +30,12 @@ def select_proxies(
     Select representative samples (proxies) from data using various methods.
 
     This function provides multiple strategies for selecting representative samples
-    from a set of embeddings. These proxies can then be used as class weights in
-    weight imprinting models.
+    from a set of embeddings for a fixed class. These proxies can then be used
+    as class weights in weight imprinting models.
+
+    Note that calculating Least-squares embeddings requires data from all classes,
+    so it is not callable via this method. Instead, use the
+    `compute_least_squares_weights` function directly as in `runner.py`.
 
     Args:
         data: Tensor of feature embeddings (shape: [n_samples, embedding_dim])
@@ -140,3 +147,74 @@ def covariance_max_selection(data: torch.Tensor, k: int):
     selected_data = data[top_k_indices]
 
     return selected_data
+
+
+def compute_least_squares_weights(class_data, lambda_reg=0.05):
+    """
+    Calculate the least-squares optimal weights for classification as derived
+    in https://arxiv.org/abs/2503.06385.
+
+    Using the formula:
+        W_LS = (1/C)M^T (Σ_T + μ_G μ_G^T + λI)^(-1)
+
+    Where:
+    - M is the class-means matrix
+    - Σ_T is the total covariance matrix
+    - μ_G is the global mean
+    - C is the number of classes
+    - λ is the regularization parameter
+
+    Args:
+        class_data: Dictionary mapping class indices to their embeddings
+        lambda_reg: Regularization parameter λ (default: 0.05)
+
+    Returns:
+        Dictionary mapping class indices to their optimal weight vectors
+    """
+    # Extract dimensions
+    n_classes = len(class_data)
+    if n_classes == 0:
+        raise ValueError("No class data provided")
+
+    # Get embedding dimension from the first class
+    first_class = next(iter(class_data.values()))
+    embed_dim = first_class.shape[1]
+    device = first_class.device
+
+    # Calculate global mean μ_G
+    all_samples_list = list(class_data.values())
+    total_samples = sum(samples.shape[0] for samples in all_samples_list)
+
+    # Weighted average for global mean
+    mu_G = torch.zeros(embed_dim, device=device)
+    for samples in all_samples_list:
+        mu_G += samples.sum(dim=0)
+    mu_G /= total_samples
+
+    # Form the class-means matrix M
+    M = torch.zeros((embed_dim, n_classes), device=device)
+
+    for c, (class_idx, samples) in enumerate(class_data.items()):
+        mu_c = torch.mean(samples, dim=0)
+        M[:, c] = mu_c
+
+    # Calculate total covariance matrix Σ_T
+    # This can be memory intensive, so we'll calculate it incrementally
+    sigma_T = torch.zeros((embed_dim, embed_dim), device=device)
+    for samples in all_samples_list:
+        centered_samples = samples - mu_G.unsqueeze(0)
+        sigma_T += torch.mm(centered_samples.T, centered_samples)
+    sigma_T /= total_samples
+
+    # Calculate W_LS using formula (3) from the paper
+    mu_G_outer = torch.outer(mu_G, mu_G)
+    eye_matrix = torch.eye(embed_dim, device=device)
+    inverse_term = torch.inverse(sigma_T + mu_G_outer + lambda_reg * eye_matrix)
+    W_LS = torch.mm(M.T, inverse_term) * (1.0 / n_classes)
+
+    # Format the result as a dictionary mapping class indices to weight vectors
+    weights = {}
+    for c, class_idx in enumerate(class_data.keys()):
+        weights[class_idx] = W_LS[c, :].unsqueeze(0)  # Shape [1, embed_dim]
+
+    return weights
