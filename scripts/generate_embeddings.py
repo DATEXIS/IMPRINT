@@ -42,10 +42,13 @@ def main():
     # Set datasets
     datasets_list = available_datasets
     # datasets_list = ["MNIST"]
+    # datasets_list = ["CIFAR100"]
+    # datasets_list = ["Places365"]
 
     # Set backbones
     backbones_list = available_backbones
     # backbones_list = ["resnet18"]
+    # backbones_list = ["convnextv2-femto-1k-224"]
 
     device_name = "cuda"  # "cpu"
     batch_size = 64
@@ -84,9 +87,7 @@ def main():
                 train_str = "train" if train else "test"
                 if dataset_name == "ImageNet" and not train:
                     train_str = "val"
-                print(
-                    f"Running {backbone_name.upper()} x {dataset_name} ({train_str})"
-                )
+                print(f"Running {backbone_name} x {dataset_name} ({train_str})")
 
                 extractor = EmbeddingExtractor(
                     device_name=device_name,
