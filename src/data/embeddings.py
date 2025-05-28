@@ -14,6 +14,7 @@ import h5py
 import numpy as np
 import torch
 from tqdm import tqdm
+from transformers.modeling_outputs import ImageClassifierOutputWithNoAttention
 
 from src.data.loader import DatasetHandler
 from src.data.datasets import EmbeddingDataset
@@ -236,7 +237,7 @@ class EmbeddingExtractor:
         save_threshold = 1 * 1024**3  # 1 GB
 
         desc = (
-            f"Extracting {self.backbone_name.upper()} x "
+            f"Extracting {self.backbone_name} x "
             f"{self.dataset_name} ({self.train_str}) embeddings for "
         )
         desc += f"{len(self.class_focus)}" if self.class_focus else "all"
@@ -259,6 +260,8 @@ class EmbeddingExtractor:
 
                 # Compute embeddings based on backbone type
                 outputs = self.backbone(inputs)
+                if isinstance(outputs, ImageClassifierOutputWithNoAttention):
+                    outputs = outputs.logits
                 outputs = outputs.view(outputs.size(0), -1)  # Flatten the outputs
 
                 # Convert to numpy and accumulate
