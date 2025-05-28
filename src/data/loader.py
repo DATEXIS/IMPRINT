@@ -35,8 +35,8 @@ available_datasets = [
     "MNIST",
     "FashionMNIST",
     "CIFAR10",
-    "CIFAR100",
-    "Places365",
+    # "CIFAR100",
+    # "Places365",
     "ImageNet",
 ]
 
