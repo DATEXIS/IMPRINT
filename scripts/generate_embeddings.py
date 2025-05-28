@@ -79,7 +79,7 @@ def main():
         raw_data_root = (
             "imagenet-data" if dataset_name == "ImageNet" else "imprinting-reproduce"
         )
-        # raw_data_root = "data"
+        # raw_data_root = "data" # for local testing
 
         embedding_root = raw_data_root
         for backbone_idx, backbone_name in enumerate(backbones_list):
