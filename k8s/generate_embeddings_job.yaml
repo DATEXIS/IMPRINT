@@ -14,6 +14,7 @@ spec:
       containers:
         - name: multi-imprinting
           image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
+          imagePullPolicy: Always # to force pulling the newest image
           command: ["python", "scripts/generate_embeddings.py"]
           env:
             - name: LANG
@@ -72,6 +73,7 @@ spec:
       imagePullSecrets:
         - name: private-registry-auth
       restartPolicy: Never
+  backoffLimit: 1
 
 # NOTES:
 # - To set the above secret keys and have them available in python env, do, e.g.,
