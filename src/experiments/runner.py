@@ -18,6 +18,7 @@ from torch.utils.data import ConcatDataset
 from torch.multiprocessing import Pool, Value, Lock
 
 from src.data.embeddings import get_embeddings
+from src.models.backbone import backbone_lambda_regs
 from src.utils.hashing import consistent_id
 from src.models.model import ImprintedModel
 from src.proxy.selection import select_proxies, compute_least_squares_weights
@@ -354,6 +355,9 @@ def run_combination(
     if not serial:
         torch.set_num_threads(torch_threads)
 
+    # Find correct lambda regularization value
+    lambda_reg = backbone_lambda_regs[combination["backbone_name"]]
+
     # Create a readable description of the label mapping
     label_mapping_desc = generate_label_mapping_desc(combination["mapping"])
 
@@ -451,8 +455,9 @@ def run_combination(
             _start_time = time.time()
 
             # Compute least-squares weights using all class data
-            ls_weights = compute_least_squares_weights(all_class_data, lambda_reg=0.05)
-            # get correct weight decay value from a dict contianing it for each backbone -> TODO
+            ls_weights = compute_least_squares_weights(
+                all_class_data, lambda_reg=lambda_reg
+            )
 
             print(
                 f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "

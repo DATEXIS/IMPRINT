@@ -35,6 +35,14 @@ backbone_weights = {
     "swin_b": Swin_B_Weights.IMAGENET1K_V1,
 }
 
+backbone_lambda_regs = {
+    "resnet18": 0.0001,  # see https://arxiv.org/pdf/1512.03385
+    "resnet50": 0.0001,  # ""
+    "vit_b_16": 0.1,  # see https://arxiv.org/pdf/2010.11929
+    "swin_b": 0.05,  # see https://arxiv.org/pdf/2103.14030
+    "convnextv2-femto-1k-224": 0.05,  # see https://arxiv.org/pdf/2301.00808
+}
+
 
 class BackboneHandler:
     """
