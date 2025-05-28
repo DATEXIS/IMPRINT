@@ -41,22 +41,11 @@ def main():
         args = {
             "data_and_res_dir": "data",
             "backbone_name": "resnet18",
-            "dataset_name": ["ImageNet"],  # ["MNIST"],
-            "mapping_name": "map1-0",  # "none",
-            "mapping": {
-                214: 0,
-                47: 1,
-                528: 2,
-                496: 3,
-                723: 4,
-                97: 5,
-                532: 6,
-                782: 7,
-                412: 8,
-                992: 9,
-            },  # {},
-            "task_name": "all",
-            "task_splits": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
+            "dataset_name": ["MNIST"],  # ["ImageNet"],
+            "mapping_name": "none",  # "map1-0",
+            "mapping": {},  # { 214: 0, 47: 1, 528: 2, 496: 3, 723: 4, 97: 5, 532: 6, 782: 7, 412: 8, 992: 9},
+            "task_name": "short",
+            "task_splits": [[0, 1, 2]],
             "combinations_slice": [0, 100],
             "use_wandb": False,
             "parallel_threads": 1,
@@ -64,7 +53,7 @@ def main():
             "use_cache": True,
             "device_name": "cpu",
             "overwrite": True,
-            "config_path": "src/config/config_reprod_sec6.3_imagenet.yaml",  # "src/config/config.yaml",
+            "config_path": "src/config/config.yaml",  # "src/config/config_reprod_sec6.3_imagenet.yaml",
         }
         # Using temp results dir for testing
         results_dir = "results_temp"
