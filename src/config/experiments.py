@@ -154,8 +154,8 @@ def filter_combinations(df):
         )
     ]
 
-    # "mean" proxy method can only choose one proxy
-    df.loc[df["proxy_method"].isin(["beta", "mean"]), "k"] = 1
+    # "mean" and "ls" proxy method can only choose one proxy
+    df.loc[df["proxy_method"].isin(["mean", "ls"]), "k"] = 1
 
     # Proxy method "all" means choosing all proxies
     df.loc[df["proxy_method"] == "all", "k"] = -1

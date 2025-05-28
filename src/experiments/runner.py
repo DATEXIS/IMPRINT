@@ -20,7 +20,7 @@ from torch.multiprocessing import Pool, Value, Lock
 from src.data.embeddings import get_embeddings
 from src.utils.hashing import consistent_id
 from src.models.model import ImprintedModel
-from src.proxy.selection import select_proxies
+from src.proxy.selection import select_proxies, compute_least_squares_weights
 from src.utils.helpers import set_all_seeds, calc_weighted_f1_score
 from src.data.prefilter import prefilter_data
 from src.data.continual import ClassContinualDataset
@@ -414,49 +414,98 @@ def run_combination(
         model.extend_num_classes(len(distinct_task_labels))
         model.to(device)
 
-        # Process each class in the current task
-        for label in distinct_task_labels:
-            # Apply normalization if specified for proxy selection
-            if combination["normalize_for_proxy_selection"] == "none":
-                train_data_label = train_data[train_labels == label]
-            elif combination["normalize_for_proxy_selection"] == "l2":
-                train_data_label = train_data[train_labels == label]
-                train_data_label = train_data_label / torch.norm(
-                    train_data_label, p=2, dim=1, keepdim=True
-                )
-            else:
-                raise ValueError(
-                    "Invalid value for 'normalize_for_proxy_selection'. "
-                    "Must be 'none' or 'l2'."
+        # Special handling for least-squares method which needs all class data
+        #  together
+        if combination["proxy_method"] == "ls":
+            # Dictionary to collect data from all classes
+            all_class_data = {}
+
+            # First collect (normalized) data for each class
+            for label in distinct_task_labels:
+                # Apply normalization if specified for proxy selection
+                if combination["normalize_for_proxy_selection"] == "none":
+                    train_data_label = train_data[train_labels == label]
+                elif combination["normalize_for_proxy_selection"] == "l2":
+                    train_data_label = train_data[train_labels == label]
+                    train_data_label = train_data_label / torch.norm(
+                        train_data_label, p=2, dim=1, keepdim=True
+                    )
+                else:
+                    raise ValueError(
+                        "Invalid value for 'normalize_for_proxy_selection'. "
+                        "Must be 'none' or 'l2'."
+                    )
+
+                # Prefilter the data according to configuration
+                filtered_task_data = prefilter_data(
+                    train_data_label,
+                    method=combination["presampling_method"],
+                    quantile=combination["presampling_quantiles_value"],
+                    fewshot=combination["presampling_fewshot_value"],
                 )
 
-            # Prefilter the data according to configuration
-            filtered_task_data = prefilter_data(
-                train_data_label,
-                method=combination["presampling_method"],
-                quantile=combination["presampling_quantiles_value"],
-                fewshot=combination["presampling_fewshot_value"],
-            )
+                # Store the filtered data for this class
+                all_class_data[label] = filtered_task_data
 
-            # Time proxy selection
+            # Time the least-squares computation
             _start_time = time.time()
 
-            # Select proxies from the filtered data
-            task_proxies = select_proxies(
-                filtered_task_data,
-                k=combination["k"],
-                method=combination["proxy_method"],
-                seed=combination["seed"],
-            ).to(device)
+            # Compute least-squares weights using all class data
+            ls_weights = compute_least_squares_weights(all_class_data, lambda_reg=0.05)
+            # get correct weight decay value from a dict contianing it for each backbone -> TODO
 
             print(
-                f"\t\t[INFO] Proxy selection '{combination['proxy_method']}' "
-                f"for label {label} in task {task_idx+1} took "
-                f"{time.time() - _start_time:.2f}s."
+                f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
+                f"took {time.time() - _start_time:.2f}s."
             )
 
-            # Extend model weights with the selected proxies
-            model.extend_ws(data=task_proxies, class_index=mapping[label])
+            # Add the computed weights to the model
+            for label, ls_weight in ls_weights.items():
+                model.extend_ws(data=ls_weight.to(device), class_index=mapping[label])
+        else:
+            # Original code for processing each class with other proxy methods
+            for label in distinct_task_labels:
+                # Apply normalization if specified for proxy selection
+                if combination["normalize_for_proxy_selection"] == "none":
+                    train_data_label = train_data[train_labels == label]
+                elif combination["normalize_for_proxy_selection"] == "l2":
+                    train_data_label = train_data[train_labels == label]
+                    train_data_label = train_data_label / torch.norm(
+                        train_data_label, p=2, dim=1, keepdim=True
+                    )
+                else:
+                    raise ValueError(
+                        "Invalid value for 'normalize_for_proxy_selection'. "
+                        "Must be 'none' or 'l2'."
+                    )
+
+                # Prefilter the data according to configuration
+                filtered_task_data = prefilter_data(
+                    train_data_label,
+                    method=combination["presampling_method"],
+                    quantile=combination["presampling_quantiles_value"],
+                    fewshot=combination["presampling_fewshot_value"],
+                )
+
+                # Time proxy selection
+                _start_time = time.time()
+
+                # Select proxies from the filtered data
+                task_proxies = select_proxies(
+                    filtered_task_data,
+                    k=combination["k"],
+                    method=combination["proxy_method"],
+                    seed=combination["seed"],
+                ).to(device)
+
+                print(
+                    f"\t\t[INFO] Proxy selection '{combination['proxy_method']}' "
+                    f"for label {label} in task {task_idx+1} took "
+                    f"{time.time() - _start_time:.2f}s."
+                )
+
+                # Extend model weights with the selected proxies
+                model.extend_ws(data=task_proxies, class_index=mapping[label])
 
         # Prepare wandb logging dictionary
         wandb_log_dict = {
