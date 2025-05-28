@@ -1,5 +1,5 @@
 {
-    "backbones": ["resnet18", "vit_b_16", "resnet50", "swin_b"],
+    "backbones": ["resnet18", "resnet50", "vit_b_16", "swin_b", "convnextv2-femto-1k-224"],
     "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
     "label_remappings": {
         "none": {},
