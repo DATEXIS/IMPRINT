@@ -26,10 +26,10 @@
         -1,
     ],
     "proxy_methods": [
-        "kmeans",
+        "ls",
     ],
     "ks": [
-        3,
+        1,
     ],
     "normalize_weights": [
         "l2",
