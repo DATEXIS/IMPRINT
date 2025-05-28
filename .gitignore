@@ -9,6 +9,7 @@ data/results_temp
 data/results
 data/embeddings
 data/raw
+imprinting-reproduce
 old_data
 
 # Byte-compiled / optimized / DLL files
