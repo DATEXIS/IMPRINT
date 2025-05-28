@@ -24,6 +24,7 @@ import torchvision.datasets as datasets
 from rasterio import RasterioIOError
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms
+from transformers import AutoImageProcessor
 
 from src.models.backbone import backbone_weights
 from src.utils.helpers import set_all_seeds
@@ -31,17 +32,20 @@ from src.utils.helpers import set_all_seeds
 load_dotenv()
 
 available_datasets = [
-    "CIFAR10",
-    "FashionMNIST",
     "MNIST",
+    "FashionMNIST",
+    "CIFAR10",
+    "CIFAR100",
+    "Places365",
     "ImageNet",
 ]
 
 torch_datasets = {
-    "CIFAR10": datasets.CIFAR10,
-    "FashionMNIST": datasets.FashionMNIST,
-    "KMNIST": datasets.KMNIST,
     "MNIST": datasets.MNIST,
+    "FashionMNIST": datasets.FashionMNIST,
+    "CIFAR10": datasets.CIFAR10,
+    "CIFAR100": datasets.CIFAR100,
+    "Places365": datasets.Places365,
 }
 
 
@@ -90,7 +94,9 @@ class DatasetHandler:
         self.seed = seed  # Store the seed for use in data loading
 
         self.train_str = "train" if self.train else "test"
-        if self.dataset_name == "ImageNet" and not self.train:
+        if self.dataset_name == "Places365" and self.train:
+            self.train_str = "train-standard"
+        if self.dataset_name in ["Places365", "ImageNet"] and not self.train:
             # For ImageNet, there is no test set. So we have to use the
             #  validation set here.
             self.train_str = "val"
@@ -125,11 +131,19 @@ class DatasetHandler:
                     "already exists. Loading from disk..."
                 )
 
-            dataset = torch_datasets[self.dataset_name](
-                root=self.raw_data_path,
-                train=self.train,
-                download=True,
-            )
+            if self.dataset_name == "Places365":
+                dataset = torch_datasets[self.dataset_name](
+                    root=self.raw_data_path,
+                    split=self.train_str,
+                    download=True,
+                    small=True,  # 256x256 images
+                )
+            else:
+                dataset = torch_datasets[self.dataset_name](
+                    root=self.raw_data_path,
+                    train=self.train,
+                    download=True,
+                )
         elif self.dataset_name == "ImageNet":
             dataset_path = self.download_from_imagenet(
                 self.raw_data_path, split=self.train_str
@@ -172,18 +186,38 @@ class DatasetHandler:
 
     def get_image_transformation(self):
         # Initialize Weight Transforms for correct preprocessing
-        weights = backbone_weights[self.backbone_name]
+        # Check if we're using a HuggingFace model
+        if self.backbone_name == "convnextv2-femto-1k-224":
 
-        if self.dataset_name in [
-            "FashionMNIST",
-            "MNIST",
-            "ImageNet",
-        ]:
-            transform = transforms.Compose(
-                [transforms.Grayscale(num_output_channels=3), weights.transforms()]
+            # Get image processor
+            processor = AutoImageProcessor.from_pretrained(
+                "facebook/convnextv2-femto-1k-224"
             )
+
+            # Create a transformation that uses the processor directly
+            def transform_with_processor(img):
+                # Convert grayscale to RGB if needed
+                if self.dataset_name in ["FashionMNIST", "MNIST"]:
+                    # Convert PIL Image to RGB if it's grayscale
+                    if img.mode == "L":
+                        img = img.convert("RGB")
+
+                # Process the image using the Hugging Face processor
+                processed = processor(images=img, return_tensors="pt")
+                # Return just the pixel_values tensor and remove the batch dimension
+                return processed.pixel_values.squeeze(0)
+
+            return transform_with_processor
         else:
-            transform = weights.transforms()
+            # Standard torchvision weights handling
+            weights = backbone_weights[self.backbone_name]
+
+            if self.dataset_name in ["FashionMNIST", "MNIST"]:  # grayscale datasets
+                transform = transforms.Compose(
+                    [transforms.Grayscale(num_output_channels=3), weights.transforms()]
+                )
+            else:
+                transform = weights.transforms()
 
         return transform
 
