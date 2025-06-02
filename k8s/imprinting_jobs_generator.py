@@ -227,9 +227,13 @@ results_dir = (
     "reprod"  # Will be used for results_dir and in dir name of generated jobs
 )
 # app_name_suffix = "fig6"
-# app_name_suffix = "imagenet"
-app_name_suffix = "non-imagenet"
+# app_name_suffix = "sec6-1"
+# app_name_suffix = "sec6-2"
+# app_name_suffix = "sec6-3-imagenet"
+app_name_suffix = "sec6-3-nimagenet"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
+# config_path = "src/config/config_reprod_sec6.1.yaml"
+# config_path = "src/config/config_reprod_sec6.2.yaml"
 # config_path = "src/config/config_reprod_sec6.3_imagenet.yaml"
 config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
 

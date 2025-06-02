@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ app_name|lower() }}-{{ backbone_name|lower|replace('_', '-') }}-{{ dataset_name_str|lower }}-{{ mapping_name|lower|replace('_', '-') }}-{{ task_name|lower|replace('_', '-') }}-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
+  name: {{ app_name|lower() }}-{{ backbone_name[:10]|lower|replace('_', '-') }}-{{ dataset_name_str|lower }}-{{ mapping_name|lower|replace('_', '-') }}-{{ task_name|lower|replace('_', '-') }}-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
   labels:
     app: multi-imprinting
 spec:
