@@ -1,8 +1,8 @@
 {
     "backbones": ["resnet18", "resnet50", "vit_b_16", "swin_b", "convnextv2-femto-1k-224"],
-    "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
+    "datasets": [["ImageNet"]],
     "label_remappings": {
-        "none": {}
+        "RANDOM_CLASS_REMAPPINGS": {}, # will be filled in by the script
     },
     "task_splits": {
         "all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
@@ -13,47 +13,46 @@
         12412312
     ],
     "normalize_input_data": [
-        "l2"
+        "none"
     ],
     "normalize_for_proxy_selection": [
+        "none",
         "l2"
     ],
     "presampling_methods": [
-        "all",
-    ],
-    "presampling_quantiles_values": [
-        [0, 1.0],
-    ],
-    "presampling_fewshot_values": [
-        -1,
-    ],
-    "proxy_methods": [
-        "kmeans",
-        "kmedoids",
-        "mean",
-        "ls",
-        "kls",
-        "cov_max",
-        "random",
-        "fps",
         "all"
     ],
+    "presampling_quantiles_values": [
+        [0, 1.0]
+    ],
+    "presampling_fewshot_values": [
+        -1
+    ],
+    "proxy_methods": [
+        "kls",
+    ],
     "ks": [
-        -1,
         1,
         2,
         3,
+        4,
         5,
+        6,
+        7,
+        8,
+        9,
         10,
-        20,
-        50,
-        100,
+        11,
+        12,
+        13,
+        14,
+        15
     ],
     "normalize_weights": [
-        "l2",
+        "none"
     ],
     "aggregation_methods": [
-        "max",
+        "max"
     ],
     "ms": [
         -1,

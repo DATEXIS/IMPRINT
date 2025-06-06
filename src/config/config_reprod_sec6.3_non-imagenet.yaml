@@ -29,7 +29,7 @@
         -1
     ],
     "proxy_methods": [
-        "kmeans"
+        "kmeans",
     ],
     "ks": [
         1,

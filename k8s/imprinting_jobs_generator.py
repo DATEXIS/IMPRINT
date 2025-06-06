@@ -20,6 +20,7 @@ def generate_jobs(
     results_dir,
     config_path,
     overwrite_json_files,
+    save_train_acc,
     use_wandb,
     device_name,
     gpu_node_selector,
@@ -47,6 +48,7 @@ def generate_jobs(
         results_dir: Directory name for storing experiment results
         config_path: Path to the YAML configuration file
         overwrite_json_files: Whether to overwrite existing result JSON files
+        save_train_acc: Whether to save training accuracy in the result JSON files
         use_wandb: Whether to use Weights & Biases logging
         device_name: Computing device to use ('cpu', 'cuda', or 'mps')
         docker_digest: Docker image digest/tag to use
@@ -146,6 +148,7 @@ def generate_jobs(
         "config_path": config_path,
         "device_name": device_name,
         "overwrite": overwrite_json_files,
+        "save_train_acc": save_train_acc,
         "use_wandb": use_wandb,
         "parallel_threads": parallel_threads,
         "torch_threads": torch_threads,
@@ -229,19 +232,26 @@ results_dir = (
 # app_name_suffix = "fig6"
 # app_name_suffix = "sec6-1"
 # app_name_suffix = "sec6-2"
+# app_name_suffix = "sec6-2kls"
 # app_name_suffix = "sec6-3-imagenet"
-app_name_suffix = "sec6-3-nimagenet"
+# app_name_suffix = "sec6-3-imagenetkls"
+# app_name_suffix = "sec6-3-nimagenet"
+app_name_suffix = "sec6-3-nimagenetkls"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
 # config_path = "src/config/config_reprod_sec6.1.yaml"
 # config_path = "src/config/config_reprod_sec6.2.yaml"
+# config_path = "src/config/config_reprod_sec6.2_kls.yaml"
 # config_path = "src/config/config_reprod_sec6.3_imagenet.yaml"
-config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
+# config_path = "src/config/config_reprod_sec6.3_imagenet_kls.yaml"
+# config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
+config_path = "src/config/config_reprod_sec6.3_non-imagenet_kls.yaml"
 
 clear_existing_jobs = True
 use_wandb = False
 overwrite_json_files = False  # Whether existing json files should be overwritte,
 #  i.e., whether runs should be redone (NOTE that wandb runs are not automatically
 #  overwritten, but rather duplicated then)
+save_train_acc = False  # Whether to save training accuracy in the result JSON files
 
 device_name = "cpu"
 
@@ -271,6 +281,7 @@ generate_jobs(
     results_dir=results_dir,
     config_path=config_path,
     overwrite_json_files=overwrite_json_files,
+    save_train_acc=save_train_acc,
     use_wandb=use_wandb,
     device_name=device_name,
     gpu_node_selector=gpu_node_selector,

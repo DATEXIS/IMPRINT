@@ -18,6 +18,7 @@ Available methods include:
 """
 
 import torch
+from typing import Dict, Tuple
 from sklearn.cluster import KMeans
 from sklearn_extra.cluster import KMedoids
 
@@ -149,7 +150,9 @@ def covariance_max_selection(data: torch.Tensor, k: int):
     return selected_data
 
 
-def compute_least_squares_weights(class_data, lambda_reg=0.05):
+def compute_least_squares_weights(
+    class_data: Dict[int, torch.Tensor], lambda_reg: float = 0.05
+):
     """
     Calculate the least-squares optimal weights for classification as derived
     in https://arxiv.org/abs/2503.06385.
@@ -165,11 +168,12 @@ def compute_least_squares_weights(class_data, lambda_reg=0.05):
     - λ is the regularization parameter
 
     Args:
-        class_data: Dictionary mapping class indices to their embeddings
+        class_data: Dict[int, Tensor] mapping class index -> embeddings ([n_i, d]).
         lambda_reg: Regularization parameter λ (default: 0.05)
 
     Returns:
-        Dictionary mapping class indices to their optimal weight vectors
+        Dict[int, Tensor] mapping original class index -> Tensor of shape [k, d],
+        where each row is the weight vector for one proxy.
     """
     # Extract dimensions
     n_classes = len(class_data)
@@ -218,3 +222,80 @@ def compute_least_squares_weights(class_data, lambda_reg=0.05):
         weights[class_idx] = W_LS[c, :].unsqueeze(0)  # Shape [1, embed_dim]
 
     return weights
+
+
+def compute_prototype_least_squares_weights(
+    class_data: Dict[int, torch.Tensor],
+    k: int = 2,
+    lambda_reg: float = 0.05,
+    seed: int = 42,
+) -> Dict[int, torch.Tensor]:
+    """
+    For each class in class_data, cluster its embeddings into k clusters,
+    then treat each cluster as a separate “pseudo‐class” to compute its
+    least-squares weight vector via compute_least_squares_weights. Finally,
+    regroup weights by original class.
+
+    Args:
+        class_data: Dict[int, Tensor] mapping class index -> embeddings ([n_i, d]).
+        k: Number of clusters (proxies) per original class.
+        lambda_reg: Regularization parameter passed to compute_least_squares_weights.
+        seed: Random seed for clustering.
+
+    Returns:
+        Dict[int, Tensor] mapping original class index -> Tensor of shape [k, d],
+        where each row is the weight vector for one proxy.
+    """
+    if k == 1:
+        return compute_least_squares_weights(class_data, lambda_reg=lambda_reg)
+
+    # Step 1: Cluster each class’s embeddings and build a “flat” proxy->samples dict
+    proxy_data: Dict[int, torch.Tensor] = {}
+    proxy_to_orig: Dict[int, Tuple[int, int]] = {}
+    next_proxy_idx = 0
+    result: Dict[int, torch.Tensor] = {}
+    d = next(iter(class_data.values())).shape[1]
+    # Initialize a buffer of shape [k, d] per original class
+    for orig_class in class_data.keys():
+        if k != -1:
+            result[orig_class] = torch.zeros(
+                (k, d), device=next(iter(class_data.values())).device
+            )
+    already_set = []
+
+    for orig_class, samples in class_data.items():
+        n_samples, _ = samples.shape
+
+        if k == -1 or n_samples < k:
+            # Then, for this class, simply use all samples as proxies
+            result[orig_class] = samples
+            already_set.append(orig_class)
+        else:
+            km = KMeans(n_clusters=k, random_state=seed)
+            km.fit(samples.to("cpu").numpy())
+            labels = torch.tensor(km.labels_, device=samples.device)
+            for proxy_id in range(k):
+                mask = labels == proxy_id
+                cluster_samples = samples[mask]
+                proxy_data[next_proxy_idx] = cluster_samples
+                proxy_to_orig[next_proxy_idx] = (orig_class, proxy_id)
+                next_proxy_idx += 1
+
+    if not proxy_data:
+        raise ValueError("No proxy data generated")
+
+    # Step 2: Compute least-squares weights for each proxy “class”
+    # compute_least_squares_weights expects Dict[int, Tensor], so we can pass proxy_data directly.
+    proxy_weights = compute_least_squares_weights(proxy_data, lambda_reg=lambda_reg)
+    # proxy_weights: Dict[proxy_idx, Tensor] where each Tensor is [1, d]
+
+    # Step 3: Regroup weights by the original class index
+    for proxy_idx, weight_tensor in proxy_weights.items():
+        orig_class, proxy_id = proxy_to_orig[proxy_idx]
+        if orig_class in already_set:
+            # If this class was already set, we can skip it
+            continue
+        # weight_tensor has shape [1, d], squeeze to [d]
+        result[orig_class][proxy_id] = weight_tensor.squeeze(0)
+
+    return result

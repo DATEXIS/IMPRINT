@@ -39,7 +39,7 @@ def main():
     if len(sys.argv) == 1:
         print("Using default parameters.")
         args = {
-            "data_and_res_dir": "data",
+            "data_and_res_dir": "imprinting-reproduce",  # "data",
             "backbone_name": "resnet18",
             "dataset_name": ["MNIST"],  # ["ImageNet"],
             "mapping_name": "none",  # "map1-0",
@@ -53,6 +53,7 @@ def main():
             "use_cache": True,
             "device_name": "cpu",
             "overwrite": True,
+            "save_train_acc": True,
             "config_path": "src/config/config.yaml",  # "src/config/config_reprod_sec6.3_imagenet.yaml",
         }
         # Using temp results dir for testing
@@ -181,6 +182,7 @@ def main():
             use_cache=args["use_cache"],
             device_name=args["device_name"],
             overwrite=args["overwrite"],
+            save_train_acc=args["save_train_acc"],
         )
 
 
@@ -311,6 +313,12 @@ def parse_input():
         help="Whether to overwrite existing result files",
     )
     parser.add_argument(
+        "--save_train_acc",
+        default=True,
+        type=lambda x: x.lower() == "true",
+        help="Whether to save training accuracy during experiments",
+    )
+    parser.add_argument(
         "--config",
         default="src/config/config.yaml",
         type=str,
@@ -361,6 +369,7 @@ def parse_input():
         "use_cache": args.uc,
         "device_name": args.dn,
         "overwrite": args.o,
+        "save_train_acc": args.save_train_acc,
         "config_path": args.config,
     }
 

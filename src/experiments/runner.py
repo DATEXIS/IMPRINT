@@ -21,7 +21,11 @@ from src.data.embeddings import get_embeddings
 from src.models.backbone import backbone_lambda_regs
 from src.utils.hashing import consistent_id
 from src.models.model import ImprintedModel
-from src.proxy.selection import select_proxies, compute_least_squares_weights
+from src.proxy.selection import (
+    select_proxies,
+    compute_least_squares_weights,
+    compute_prototype_least_squares_weights,
+)
 from src.utils.helpers import set_all_seeds, calc_weighted_f1_score
 from src.data.prefilter import prefilter_data
 from src.data.continual import ClassContinualDataset
@@ -120,6 +124,7 @@ def run_combinations(
     use_cache: bool = False,
     device_name: str = "cpu",
     overwrite: bool = False,
+    save_train_acc: bool = False,
 ):
     """
     Run multiple experiment configurations.
@@ -137,6 +142,7 @@ def run_combinations(
         use_cache: Whether to cache data in memory
         device_name: Device name ("cpu", "cuda", or "mps")
         overwrite: Whether to overwrite existing results
+        save_train_acc: Whether to save training accuracy in results
     """
     # Device management
     if device_name == "mps" and torch.backends.mps.is_available():
@@ -216,6 +222,7 @@ def run_combinations(
                     torch_threads,
                     device,
                     overwrite,
+                    save_train_acc,
                 ),
                 combinations,
             )
@@ -236,6 +243,7 @@ def run_combinations(
                 torch_threads,
                 device,
                 overwrite,
+                save_train_acc,
                 _comb,
             )
             _counter += 1
@@ -258,6 +266,7 @@ def run_combination_with_progress(
     torch_threads,
     device,
     overwrite,
+    save_train_acc,
     combination,
 ):
     """
@@ -278,6 +287,7 @@ def run_combination_with_progress(
         torch_threads,
         device,
         overwrite,
+        save_train_acc,
         combination,
     )
 
@@ -300,6 +310,7 @@ def run_combination(
     torch_threads,
     device,
     overwrite,
+    save_train_acc,
     combination,
 ):
     """
@@ -318,6 +329,7 @@ def run_combination(
         torch_threads: Number of threads for torch operations
         device: Device to use for computation
         overwrite: Whether to overwrite existing results
+        save_train_acc: Whether to save training accuracy in results
         combination: The experiment configuration to run
     """
     # Check for mNN aggregation and adjust device if needed
@@ -348,6 +360,7 @@ def run_combination(
         f"\t[INFO] Running combination id {_id} "
         f"(presampling_fewshot_value={combination['presampling_fewshot_value']}, "
         f"proxy_method={combination['proxy_method']}, "
+        f"k={combination['k']}, "
         f"aggreg_method={combination['aggregation_method']})"
     )
 
@@ -397,6 +410,8 @@ def run_combination(
     # Initialize containers for metrics
     accs = []
     f1s = []
+    if save_train_acc:
+        train_accs = []
 
     # Process each task in the continual learning scenario
     for task_idx in range(continual_loader.num_tasks()):
@@ -420,7 +435,7 @@ def run_combination(
 
         # Special handling for least-squares method which needs all class data
         #  together
-        if combination["proxy_method"] == "ls":
+        if combination["proxy_method"] in ["ls", "kls"]:
             # Dictionary to collect data from all classes
             all_class_data = {}
 
@@ -455,14 +470,25 @@ def run_combination(
             _start_time = time.time()
 
             # Compute least-squares weights using all class data
-            ls_weights = compute_least_squares_weights(
-                all_class_data, lambda_reg=lambda_reg
-            )
-
-            print(
-                f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
-                f"took {time.time() - _start_time:.2f}s."
-            )
+            if combination["proxy_method"] == "ls":
+                ls_weights = compute_least_squares_weights(
+                    all_class_data, lambda_reg=lambda_reg
+                )
+                print(
+                    f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
+                    f"took {time.time() - _start_time:.2f}s."
+                )
+            elif combination["proxy_method"] == "kls":
+                ls_weights = compute_prototype_least_squares_weights(
+                    all_class_data,
+                    k=combination["k"],
+                    lambda_reg=lambda_reg,
+                    seed=combination["seed"],
+                )
+                print(
+                    f"\t\t[INFO] Prototype least-squares weights computation for task "
+                    f"{task_idx+1} took {time.time() - _start_time:.2f}s."
+                )
 
             # Add the computed weights to the model
             for label, ls_weight in ls_weights.items():
@@ -533,16 +559,32 @@ def run_combination(
                 [test_labels_mapped_accum, test_labels_mapped]
             )
 
+        # If desired, get ready to compute training accuracy later
+        if save_train_acc:
+            train_labels_mapped = map_labels(train_labels, mapping, device)
+            if task_idx == 0 and continual_loader.num_tasks() > 1:
+                train_data_accum = train_data
+                train_labels_mapped_accum = train_labels_mapped
+            elif task_idx > 0:
+                train_data_accum = torch.vstack([train_data_accum, train_data])
+                train_labels_mapped_accum = torch.hstack(
+                    [train_labels_mapped_accum, train_labels_mapped]
+                )
+
         # Evaluate model performance - model is always in eval mode since we removed SGD
         model.eval()  # ...but let's be sure
         accs.append(model.accuracy(test_data, test_labels_mapped))
         f1s.append(model.f1_scores(test_data, test_labels_mapped))
+        if save_train_acc:
+            train_accs.append(model.accuracy(train_data, train_labels_mapped))
 
         elapsed_time = time.time() - start_time
         print(
             f"\t\t[INFO] Accuracy on task {task_idx+1} ({task_desc}): "
             f"{accs[task_idx]:.2f}%; {elapsed_time:.3f}s runtime"
         )
+        if save_train_acc:
+            print(f"\t\t\t[INFO] Training accuracy: {train_accs[task_idx]:.2f}%")
 
         # Log task results to wandb
         if use_wandb:
@@ -564,6 +606,8 @@ def run_combination(
     # Store results for first task
     combination["task_acc"] = accs[0]
     combination["task_f1s"] = f1s[0]
+    if save_train_acc:
+        combination["task_train_acc"] = train_accs[0]
     combination["label_mapping_desc"] = label_mapping_desc
     combination["task_split"] = continual_loader.task_splits[0]
     combination["task_desc"] = " & ".join(map(str, continual_loader.task_splits[0]))

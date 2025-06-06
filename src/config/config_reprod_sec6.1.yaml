@@ -37,6 +37,7 @@
         "kmedoids",
         "mean",
         "ls",
+        "kls",
         "cov_max",
         "random",
         "fps",
