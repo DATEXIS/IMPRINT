@@ -76,7 +76,9 @@ spec:
   backoffLimit: 1
 
 # NOTES:
-# - To set the above secret keys and have them available in python env, do, e.g.,
+# - to build, run docker build -t registry.datexis.com/jwesterhoff/multi-imprinting:latest . --platform=linux/amd64
+# - to push, run docker push registry.datexis.com/jwesterhoff/multi-imprinting:latest
+# - to set the above secret keys and have them available in python env, do, e.g.,
 #   `kubectl create secret generic kaggle-key --from-literal=KAGGLE_KEY='123'
 # - tqdm and k9s: Run `kubectl attach <pod-name>` to see the progress of the job
 #   nicely in the terminal (works well with tqdm unlike `kubectl log`)
