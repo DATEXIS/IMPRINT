@@ -54,7 +54,7 @@ def init_worker(counter, lock):
 
 def load_data(
     backbone_name: str,
-    dataset_name: str,
+    dataset_name: list[str],
     label_mapping: dict,
     task_splits: list[list[int]],
     data_dir: str,
@@ -162,9 +162,7 @@ def run_combinations(
     # Check combinations for validity (backbone, dataset, label_mapping and
     #  task_splits must be constant, because otherwise the previous data
     #  loading/caching would work out here/improve anything).
-    backbone_name, dataset_name, label_mapping, task_splits = check_combinations(
-        combinations
-    )
+    backbone_name, dataset_name, label_mapping, task_splits = check_combinations(combinations)
 
     # Print run configuration
     parallel_doc = (
@@ -227,10 +225,7 @@ def run_combinations(
                 combinations,
             )
     else:
-        print(
-            f"[INFO] Running all {len(combinations)} combinations in serial "
-            "via a for-loop."
-        )
+        print(f"[INFO] Running all {len(combinations)} combinations in serial " "via a for-loop.")
         _counter = 0
         for _comb in combinations:
             run_combination(
@@ -249,8 +244,7 @@ def run_combinations(
             _counter += 1
             if _counter % 5 == 0:
                 print(
-                    f"[INFO] Finished running {_counter} of "
-                    f"{len(combinations)} combinations."
+                    f"[INFO] Finished running {_counter} of " f"{len(combinations)} combinations."
                 )
 
     print(f"[INFO] Finished running all {len(combinations)} combinations.")
@@ -471,9 +465,7 @@ def run_combination(
 
             # Compute least-squares weights using all class data
             if combination["proxy_method"] == "ls":
-                ls_weights = compute_least_squares_weights(
-                    all_class_data, lambda_reg=lambda_reg
-                )
+                ls_weights = compute_least_squares_weights(all_class_data, lambda_reg=lambda_reg)
                 print(
                     f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
                     f"took {time.time() - _start_time:.2f}s."
@@ -555,9 +547,7 @@ def run_combination(
             test_labels_mapped_accum = test_labels_mapped
         elif task_idx > 0:
             test_data_accum = torch.vstack([test_data_accum, test_data])
-            test_labels_mapped_accum = torch.hstack(
-                [test_labels_mapped_accum, test_labels_mapped]
-            )
+            test_labels_mapped_accum = torch.hstack([test_labels_mapped_accum, test_labels_mapped])
 
         # If desired, get ready to compute training accuracy later
         if save_train_acc:
@@ -685,7 +675,7 @@ def check_combinations(combinations: list):
     return backbone_name, dataset_name, label_mapping, task_splits
 
 
-def get_data(backbone_name, dataset_name, data_dir, label_mapping=None):
+def get_data(backbone_name: str, dataset_name: list, data_dir: str, label_mapping=None):
     """
     Load embeddings for the specified dataset(s).
 
@@ -712,40 +702,38 @@ def get_data(backbone_name, dataset_name, data_dir, label_mapping=None):
             label_mapping=label_mapping,
         )
 
-    elif len(dataset_name) == 2:
-        # Two datasets case
-        embeddings_train_1, embeddings_test_1, embedding_size_1 = get_embeddings(
-            dataset_name[0],
-            backbone_name,
-            offset=0,
-            root=data_dir,
-            splits=["train", "test"],
-            label_mapping=label_mapping,
-        )
+    elif len(dataset_name) > 1:
+        # Multiple datasets case, e.g., for MNIST&MNIST-M&USPS&SVHN
+        embeddings_trains = []
+        embeddings_tests = []
+        offset = 0
+        embedding_size_prev = None
+        for dataset in dataset_name:
+            embeddings_train, embeddings_test, embedding_size = get_embeddings(
+                dataset,
+                backbone_name,
+                offset=offset,
+                root=data_dir,
+                splits=["train", "test"],
+                label_mapping=label_mapping,
+            )
+            if embedding_size_prev is not None:
+                assert (
+                    embedding_size_prev == embedding_size
+                ), "Embedding sizes must match across datasets!"
+                embedding_size_prev = embedding_size
+            embeddings_trains.append(embeddings_train)
+            embeddings_tests.append(embeddings_test)
+            offset += embeddings_train.number_of_classes_without_mapping
 
-        # Apply offset based on the first dataset
-        offset = embeddings_train_1.number_of_classes_without_mapping
         # TODO: I think the offset should be applied after the mapping, because
         #  e.g., for ImageNet, where we do not have classes 0-999, but only
         #  our selected few (focused ones), it will not work out this way.
-        embeddings_train_2, embeddings_test_2, embedding_size_2 = get_embeddings(
-            dataset_name[1],
-            backbone_name,
-            offset=offset,
-            root=data_dir,
-            splits=["train", "test"],
-            label_mapping=label_mapping,
-        )
+        # For MNIST&MNIST-M&USPS&SVHN it works fine this way, though, because
+        #  we take all classes from all datasets.
 
-        # Verify embedding sizes match
-        assert (
-            embedding_size_1 == embedding_size_2
-        ), "Embedding sizes must be the same!"
-
-        # Combine datasets
-        embedding_size = embedding_size_1
-        embeddings_train = ConcatDataset([embeddings_train_1, embeddings_train_2])
-        embeddings_test = ConcatDataset([embeddings_test_1, embeddings_test_2])
+        embeddings_train = ConcatDataset(embeddings_trains)
+        embeddings_test = ConcatDataset(embeddings_tests)
 
     else:
         raise ValueError("Only one or two datasets are allowed!")
@@ -807,15 +795,10 @@ def get_mapping(continual_loader, task_idx, num_previous_classes):
     distinct_task_labels = continual_loader.task_splits[task_idx]
 
     # Create new consecutive indices for these labels
-    new_labels = np.arange(
-        num_previous_classes, num_previous_classes + len(distinct_task_labels)
-    )
+    new_labels = np.arange(num_previous_classes, num_previous_classes + len(distinct_task_labels))
 
     # Create the mapping
-    mapping = {
-        distinct_task_labels[i]: new_labels[i]
-        for i in range(len(distinct_task_labels))
-    }
+    mapping = {distinct_task_labels[i]: new_labels[i] for i in range(len(distinct_task_labels))}
 
     return distinct_task_labels, mapping
 
@@ -832,9 +815,7 @@ def map_labels(labels, mapping, device):
     Returns:
         torch.Tensor: Tensor of mapped labels
     """
-    labels_mapped = torch.tensor([mapping[_label.item()] for _label in labels]).to(
-        device
-    )
+    labels_mapped = torch.tensor([mapping[_label.item()] for _label in labels]).to(device)
     return labels_mapped
 
 

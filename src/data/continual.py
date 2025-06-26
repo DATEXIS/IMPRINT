@@ -1,8 +1,10 @@
 """
 Continual learning dataset management.
 
-This module provides classes and utilities for managing data in a continual learning
-scenario, organizing data into tasks and providing efficient memory management.
+This module provides classes and utilities for managing data in a continual
+learning scenario, organizing data into tasks and providing efficient memory
+management.
+
 Note that in this paper, we only focus on 1-step CL, that is, only one
 task is learned at a time. But this code allows for actual CL as well.
 """
@@ -32,12 +34,14 @@ class ClassContinualDataset:
         Initialize the continual learning dataset manager.
 
         Args:
-            train_dataset: Training dataset (can be a single dataset or a concatenation)
+            train_dataset: Training dataset (can be a single dataset or a
+                           concatenation)
             test_dataset: Test dataset corresponding to the training dataset
             task_splits: List of class indices for each task in the continual
                          learning scenario.
             use_cache: Whether to cache task data in memory
-            use_shared_memory: Whether to use shared memory tensors for multiprocessing
+            use_shared_memory: Whether to use shared memory tensors for
+                               multiprocessing
         """
         self.train_dataset = train_dataset
         self.test_dataset = test_dataset
@@ -47,8 +51,7 @@ class ClassContinualDataset:
         for task_split in task_splits:
             assert len(task_split) > 0, "Each task split must have at least one class"
             assert all(
-                isinstance(class_idx, int) and class_idx > -1
-                for class_idx in task_split
+                isinstance(class_idx, int) and class_idx > -1 for class_idx in task_split
             ), "Class indices must be non-negative integers"
 
         self.task_splits = task_splits
@@ -80,11 +83,7 @@ class ClassContinualDataset:
             ValueError: If task_idx is invalid
         """
         # Validate task index
-        if (
-            not isinstance(task_idx, int)
-            or task_idx < 0
-            or task_idx >= len(self.task_splits)
-        ):
+        if not isinstance(task_idx, int) or task_idx < 0 or task_idx >= len(self.task_splits):
             raise ValueError(
                 f"Invalid task index {task_idx} "
                 f"(must be an integer between 0 and {len(self.task_splits)-1})"
@@ -104,33 +103,19 @@ class ClassContinualDataset:
 
         # Handle both single and concatenated datasets
         if isinstance(self.train_dataset, ConcatDataset):
-            # For concatenated datasets (e.g., MNIST&FashionMNIST)
-            task_train_dataset_1 = self.train_dataset.datasets[0].get_subset_by_labels(
-                current_classes
-            )
-            task_train_dataset_2 = self.train_dataset.datasets[1].get_subset_by_labels(
-                current_classes
-            )
-
-            task_test_dataset_1 = self.test_dataset.datasets[0].get_subset_by_labels(
-                current_classes
-            )
-            task_test_dataset_2 = self.test_dataset.datasets[1].get_subset_by_labels(
-                current_classes
-            )
-
-            task_train_dataset = ConcatDataset(
-                [task_train_dataset_1, task_train_dataset_2]
-            )
-            task_test_dataset = ConcatDataset(
-                [task_test_dataset_1, task_test_dataset_2]
-            )
+            # For concatenated datasets (e.g., MNIST&MNIST-M&USPS&SVHN)
+            task_train_datasets = []
+            task_test_datasets = []
+            for dataset in self.train_dataset.datasets:
+                task_train_datasets.append(dataset.get_subset_by_labels(current_classes))
+            for dataset in self.test_dataset.datasets:
+                task_test_datasets.append(dataset.get_subset_by_labels(current_classes))
+            task_train_dataset = ConcatDataset(task_train_datasets)
+            task_test_dataset = ConcatDataset(task_test_datasets)
 
         else:
             # For a single dataset
-            task_train_dataset = self.train_dataset.get_subset_by_labels(
-                current_classes
-            )
+            task_train_dataset = self.train_dataset.get_subset_by_labels(current_classes)
             task_test_dataset = self.test_dataset.get_subset_by_labels(current_classes)
 
         # Handle caching if enabled
@@ -199,15 +184,7 @@ class ClassContinualDataset:
 
         # Move each cached task's data to the specified device
         for task_idx in self.tasks_cached:
-            self.shared_train_data[task_idx] = self.shared_train_data[task_idx].to(
-                device
-            )
-            self.shared_train_labels[task_idx] = self.shared_train_labels[task_idx].to(
-                device
-            )
-            self.shared_test_data[task_idx] = self.shared_test_data[task_idx].to(
-                device
-            )
-            self.shared_test_labels[task_idx] = self.shared_test_labels[task_idx].to(
-                device
-            )
+            self.shared_train_data[task_idx] = self.shared_train_data[task_idx].to(device)
+            self.shared_train_labels[task_idx] = self.shared_train_labels[task_idx].to(device)
+            self.shared_test_data[task_idx] = self.shared_test_data[task_idx].to(device)
+            self.shared_test_labels[task_idx] = self.shared_test_labels[task_idx].to(device)
