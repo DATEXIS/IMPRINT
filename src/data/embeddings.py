@@ -42,9 +42,7 @@ def get_embeddings_path(
     train_str = "train" if train else "test"
     if dataset_name == "ImageNet" and not train:
         train_str = "val"
-    embeddings_path = os.path.join(
-        root, "embeddings", dataset_name, backbone_name, train_str
-    )
+    embeddings_path = os.path.join(root, "embeddings", dataset_name, backbone_name, train_str)
     embeddings_filename = f"embeddings_{dataset_name}_{backbone_name}_{train_str}.h5"
     return embeddings_path, embeddings_filename
 
@@ -296,8 +294,7 @@ class EmbeddingExtractor:
             )
 
         print(
-            f"\t{total_size_in_bytes / 10**9}GB of embeddings saved to "
-            f"{self.embeddings_file}"
+            f"\t{total_size_in_bytes / 10**9}GB of embeddings saved to " f"{self.embeddings_file}"
         )
 
     def save_embeddings(self, embeddings, labels, init=False):
@@ -318,13 +315,9 @@ class EmbeddingExtractor:
                     maxshape=(None, embeddings.shape[1]),
                     dtype=np.float32,
                 )
-                f.create_dataset(
-                    "labels", data=labels, maxshape=(None,), dtype=np.int32
-                )
+                f.create_dataset("labels", data=labels, maxshape=(None,), dtype=np.int32)
             else:
-                f["embeddings"].resize(
-                    (f["embeddings"].shape[0] + embeddings.shape[0]), axis=0
-                )
+                f["embeddings"].resize((f["embeddings"].shape[0] + embeddings.shape[0]), axis=0)
                 f["embeddings"][-embeddings.shape[0] :] = embeddings
                 f["labels"].resize((f["labels"].shape[0] + labels.shape[0]), axis=0)
                 f["labels"][-labels.shape[0] :] = labels
@@ -372,9 +365,7 @@ class EmbeddingExtractor:
 
         # Determine data sources
         embeddings_location_str = "From Disk" if self.embeddings_exist else "Extracted"
-        data_location_str = (
-            "From Disk" if self.dataset_handler.data_downloaded else "Downloaded"
-        )
+        data_location_str = "From Disk" if self.dataset_handler.data_downloaded else "Downloaded"
 
         time_taken = time.time() - start_time
 
