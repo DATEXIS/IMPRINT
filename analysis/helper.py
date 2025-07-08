@@ -75,9 +75,7 @@ ABBREVS = {
 }
 
 
-def save_wandb_to_csv(
-    data: list[dict], start_time="", finish_time="", filename="wandb_crawled_at"
-):
+def save_wandb_to_csv(data: list[dict], start_time="", finish_time="", filename="wandb_crawled_at"):
     """
     Parameters:
         data (list[dict]): List of dictionaries.
@@ -94,9 +92,7 @@ def save_wandb_to_csv(
         ),
         index=False,
     )
-    print(
-        f"{len(df)} runs saved to {filename} at {datetime.now().strftime('%Y-%m-%d_%H-%M')}"
-    )
+    print(f"{len(df)} runs saved to {filename} at {datetime.now().strftime('%Y-%m-%d_%H-%M')}")
 
 
 def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
@@ -153,9 +149,7 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
     _created_at = ""
     for run in runs:
         _counter += 1
-        if (
-            _counter % 10 == 0 and run.created_at[:10] != _created_at
-        ) or _counter % 500 == 0:
+        if (_counter % 10 == 0 and run.created_at[:10] != _created_at) or _counter % 500 == 0:
             _created_at = run.created_at[:10]
             print(
                 f"Fetching runs created at {_created_at} ({_counter} runs checked, "
@@ -177,12 +171,10 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
                 "task_acc": summary.get("task_acc"),
                 "task_f1": summary.get("task_f1"),
                 "time_elapsed": summary.get("time_elapsed"),
-                **{
-                    key: config.get(key) for key in keys
-                },  # Add all other hyperparameters
-                "created_at": datetime.strptime(
-                    run.created_at, "%Y-%m-%dT%H:%M:%SZ"
-                ).strftime("%Y-%m-%d_%H:%M:%S"),
+                **{key: config.get(key) for key in keys},  # Add all other hyperparameters
+                "created_at": datetime.strptime(run.created_at, "%Y-%m-%dT%H:%M:%SZ").strftime(
+                    "%Y-%m-%d_%H:%M:%S"
+                ),
             }
         )
         _num_saved_runs += 1
@@ -191,9 +183,7 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
         if _num_saved_runs % 10_000 == 0:
             save_wandb_to_csv(data, start_time)
 
-    save_wandb_to_csv(
-        data, start_time, finish_time=datetime.now().strftime("%Y-%m-%d_%H-%M")
-    )
+    save_wandb_to_csv(data, start_time, finish_time=datetime.now().strftime("%Y-%m-%d_%H-%M"))
     print("DONE")
 
 
@@ -230,6 +220,7 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         "seed",
         ###
         "task_acc",
+        "task_train_acc",  # Not necessarily existing, checked below
         "task_f1s",
         "runtime",
         ###
@@ -260,10 +251,7 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         # Load the json file
         run = json.load(open(file_path))
 
-        if (
-            datetime.strptime(run["created_at"], "%Y-%m-%d_%H:%M:%S")
-            < ignore_data_before
-        ):
+        if datetime.strptime(run["created_at"], "%Y-%m-%d_%H:%M:%S") < ignore_data_before:
             _num_ignored_runs += 1
             continue
 
@@ -284,6 +272,10 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
 
     df = pd.DataFrame(data)
 
+    # Only if "task_train_acc" is present, we can slice it out
+    if "task_train_acc" not in df.columns:
+        keys.remove("task_train_acc")
+
     # Slice out the keys we are interested in
     df = df[keys]
 
@@ -295,9 +287,7 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
 
     # Save to CSV
     origin_tar_file_name = raw_json_results_dir.split("/")[-2]
-    filename = (
-        f"{_num_gathered_runs}runs_gathered_from_{origin_tar_file_name}_jsons.csv"
-    )
+    filename = f"{_num_gathered_runs}runs_gathered_from_{origin_tar_file_name}_jsons.csv"
     df.to_csv(
         os.path.join(
             "raw_results",
@@ -314,9 +304,7 @@ def get_combination_name_column(df, groupparams):
     highlighted_hyperparams. Use "ABBREV" dict to shorten the keys and
     values to form 'short' strings."""
     return df[[hp for hp in HYPERPARAMS if hp not in groupparams]].apply(
-        lambda x: "  &  ".join(
-            [f"{ABBREVS.get(k, k)}={ABBREVS.get(v, v)}" for k, v in x.items()]
-        ),
+        lambda x: "  &  ".join([f"{ABBREVS.get(k, k)}={ABBREVS.get(v, v)}" for k, v in x.items()]),
         axis=1,
     )
 
@@ -354,9 +342,7 @@ def draw_cd_diag_for_selected_runs(
     )
 
     # Remove "OVERALL BEST" rows
-    df_seeds_agg_filtered = df_seeds_agg_filtered[
-        df_seeds_agg_filtered["WHAT?"] != "OVERALL BEST"
-    ]
+    df_seeds_agg_filtered = df_seeds_agg_filtered[df_seeds_agg_filtered["WHAT?"] != "OVERALL BEST"]
 
     df_seeds_agg_filtered["WHAT?"] = df_seeds_agg_filtered["WHAT?"].str.replace(
         r"[\\*]", "", regex=True
@@ -377,11 +363,7 @@ def draw_cd_diag_for_selected_runs(
     df_seeds_agg_filtered["combination_name"] = df_seeds_agg_filtered[
         highlightparams + ["WHAT?"]
     ].apply(
-        lambda x: (
-            "  &  ".join([str(el) for el in x[:-1]])
-            if x[-1] == "BEST IN GROUP"
-            else x[-1]
-        ),
+        lambda x: ("  &  ".join([str(el) for el in x[:-1]]) if x[-1] == "BEST IN GROUP" else x[-1]),
         axis=1,
     )
 

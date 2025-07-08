@@ -8,13 +8,17 @@ the weight imprinting framework, representing class prototypes.
 Available methods include:
 - Random selection
 - Mean embedding
+- Least-Squares embeddings (as derived in [1])
 - k-means clustering
 - k-medoids clustering
 - Farthest point sampling
 - Covariance-based methods
+
+[1] https://arxiv.org/abs/2503.06385
 """
 
 import torch
+from typing import Dict, Tuple
 from sklearn.cluster import KMeans
 from sklearn_extra.cluster import KMedoids
 
@@ -27,8 +31,12 @@ def select_proxies(
     Select representative samples (proxies) from data using various methods.
 
     This function provides multiple strategies for selecting representative samples
-    from a set of embeddings. These proxies can then be used as class weights in
-    weight imprinting models.
+    from a set of embeddings for a fixed class. These proxies can then be used
+    as class weights in weight imprinting models.
+
+    Note that calculating Least-squares embeddings requires data from all classes,
+    so it is not callable via this method. Instead, use the
+    `compute_least_squares_weights` function directly as in `runner.py`.
 
     Args:
         data: Tensor of feature embeddings (shape: [n_samples, embedding_dim])
@@ -140,3 +148,154 @@ def covariance_max_selection(data: torch.Tensor, k: int):
     selected_data = data[top_k_indices]
 
     return selected_data
+
+
+def compute_least_squares_weights(
+    class_data: Dict[int, torch.Tensor], lambda_reg: float = 0.05
+):
+    """
+    Calculate the least-squares optimal weights for classification as derived
+    in https://arxiv.org/abs/2503.06385.
+
+    Using the formula:
+        W_LS = (1/C)M^T (Σ_T + μ_G μ_G^T + λI)^(-1)
+
+    Where:
+    - M is the class-means matrix
+    - Σ_T is the total covariance matrix
+    - μ_G is the global mean
+    - C is the number of classes
+    - λ is the regularization parameter
+
+    Args:
+        class_data: Dict[int, Tensor] mapping class index -> embeddings ([n_i, d]).
+        lambda_reg: Regularization parameter λ (default: 0.05)
+
+    Returns:
+        Dict[int, Tensor] mapping original class index -> Tensor of shape [k, d],
+        where each row is the weight vector for one proxy.
+    """
+    # Extract dimensions
+    n_classes = len(class_data)
+    if n_classes == 0:
+        raise ValueError("No class data provided")
+
+    # Get embedding dimension from the first class
+    first_class = next(iter(class_data.values()))
+    embed_dim = first_class.shape[1]
+    device = first_class.device
+
+    # Calculate global mean μ_G
+    all_samples_list = list(class_data.values())
+    total_samples = sum(samples.shape[0] for samples in all_samples_list)
+
+    # Weighted average for global mean
+    mu_G = torch.zeros(embed_dim, device=device)
+    for samples in all_samples_list:
+        mu_G += samples.sum(dim=0)
+    mu_G /= total_samples
+
+    # Form the class-means matrix M
+    M = torch.zeros((embed_dim, n_classes), device=device)
+
+    for c, (class_idx, samples) in enumerate(class_data.items()):
+        mu_c = torch.mean(samples, dim=0)
+        M[:, c] = mu_c
+
+    # Calculate total covariance matrix Σ_T
+    # This can be memory intensive, so we'll calculate it incrementally
+    sigma_T = torch.zeros((embed_dim, embed_dim), device=device)
+    for samples in all_samples_list:
+        centered_samples = samples - mu_G.unsqueeze(0)
+        sigma_T += torch.mm(centered_samples.T, centered_samples)
+    sigma_T /= total_samples
+
+    # Calculate W_LS using formula (3) from the paper
+    mu_G_outer = torch.outer(mu_G, mu_G)
+    eye_matrix = torch.eye(embed_dim, device=device)
+    inverse_term = torch.inverse(sigma_T + mu_G_outer + lambda_reg * eye_matrix)
+    W_LS = torch.mm(M.T, inverse_term) * (1.0 / n_classes)
+
+    # Format the result as a dictionary mapping class indices to weight vectors
+    weights = {}
+    for c, class_idx in enumerate(class_data.keys()):
+        weights[class_idx] = W_LS[c, :].unsqueeze(0)  # Shape [1, embed_dim]
+
+    return weights
+
+
+def compute_prototype_least_squares_weights(
+    class_data: Dict[int, torch.Tensor],
+    k: int = 2,
+    lambda_reg: float = 0.05,
+    seed: int = 42,
+) -> Dict[int, torch.Tensor]:
+    """
+    For each class in class_data, cluster its embeddings into k clusters,
+    then treat each cluster as a separate “pseudo‐class” to compute its
+    least-squares weight vector via compute_least_squares_weights. Finally,
+    regroup weights by original class.
+
+    Args:
+        class_data: Dict[int, Tensor] mapping class index -> embeddings ([n_i, d]).
+        k: Number of clusters (proxies) per original class.
+        lambda_reg: Regularization parameter passed to compute_least_squares_weights.
+        seed: Random seed for clustering.
+
+    Returns:
+        Dict[int, Tensor] mapping original class index -> Tensor of shape [k, d],
+        where each row is the weight vector for one proxy.
+    """
+    if k == 1:
+        return compute_least_squares_weights(class_data, lambda_reg=lambda_reg)
+
+    # Step 1: Cluster each class’s embeddings and build a “flat” proxy->samples dict
+    proxy_data: Dict[int, torch.Tensor] = {}
+    proxy_to_orig: Dict[int, Tuple[int, int]] = {}
+    next_proxy_idx = 0
+    result: Dict[int, torch.Tensor] = {}
+    d = next(iter(class_data.values())).shape[1]
+    # Initialize a buffer of shape [k, d] per original class
+    for orig_class in class_data.keys():
+        if k != -1:
+            result[orig_class] = torch.zeros(
+                (k, d), device=next(iter(class_data.values())).device
+            )
+    already_set = []
+
+    for orig_class, samples in class_data.items():
+        n_samples, _ = samples.shape
+
+        if k == -1 or n_samples < k:
+            # Then, for this class, simply use all samples as proxies
+            result[orig_class] = samples
+            already_set.append(orig_class)
+        else:
+            km = KMeans(n_clusters=k, random_state=seed)
+            km.fit(samples.to("cpu").numpy())
+            labels = torch.tensor(km.labels_, device=samples.device)
+            for proxy_id in range(k):
+                mask = labels == proxy_id
+                cluster_samples = samples[mask]
+                proxy_data[next_proxy_idx] = cluster_samples
+                proxy_to_orig[next_proxy_idx] = (orig_class, proxy_id)
+                next_proxy_idx += 1
+
+    if not proxy_data:
+        raise ValueError("No proxy data generated")
+
+    # Step 2: Compute least-squares weights for each proxy “class”
+    # compute_least_squares_weights expects Dict[int, Tensor], so we can pass proxy_data directly.
+    proxy_weights = compute_least_squares_weights(proxy_data, lambda_reg=lambda_reg)
+    # proxy_weights: Dict[proxy_idx, Tensor] where each Tensor is [1, d]
+
+    # Step 3: Regroup weights by the original class index
+    for proxy_idx, weight_tensor in proxy_weights.items():
+        orig_class, proxy_id = proxy_to_orig[proxy_idx]
+        if orig_class in already_set:
+            # If this class was already set, we can skip it
+            continue
+        # weight_tensor has shape [1, d], squeeze to [d]
+        result[orig_class][proxy_id] = weight_tensor.squeeze(0)
+
+    return result

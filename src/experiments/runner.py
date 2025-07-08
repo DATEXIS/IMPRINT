@@ -18,9 +18,14 @@ from torch.utils.data import ConcatDataset
 from torch.multiprocessing import Pool, Value, Lock
 
 from src.data.embeddings import get_embeddings
+from src.models.backbone import backbone_lambda_regs
 from src.utils.hashing import consistent_id
 from src.models.model import ImprintedModel
-from src.proxy.selection import select_proxies
+from src.proxy.selection import (
+    select_proxies,
+    compute_least_squares_weights,
+    compute_prototype_least_squares_weights,
+)
 from src.utils.helpers import set_all_seeds, calc_weighted_f1_score
 from src.data.prefilter import prefilter_data
 from src.data.continual import ClassContinualDataset
@@ -49,7 +54,7 @@ def init_worker(counter, lock):
 
 def load_data(
     backbone_name: str,
-    dataset_name: str,
+    dataset_name: list[str],
     label_mapping: dict,
     task_splits: list[list[int]],
     data_dir: str,
@@ -119,6 +124,7 @@ def run_combinations(
     use_cache: bool = False,
     device_name: str = "cpu",
     overwrite: bool = False,
+    save_train_acc: bool = False,
 ):
     """
     Run multiple experiment configurations.
@@ -136,6 +142,7 @@ def run_combinations(
         use_cache: Whether to cache data in memory
         device_name: Device name ("cpu", "cuda", or "mps")
         overwrite: Whether to overwrite existing results
+        save_train_acc: Whether to save training accuracy in results
     """
     # Device management
     if device_name == "mps" and torch.backends.mps.is_available():
@@ -155,9 +162,7 @@ def run_combinations(
     # Check combinations for validity (backbone, dataset, label_mapping and
     #  task_splits must be constant, because otherwise the previous data
     #  loading/caching would work out here/improve anything).
-    backbone_name, dataset_name, label_mapping, task_splits = check_combinations(
-        combinations
-    )
+    backbone_name, dataset_name, label_mapping, task_splits = check_combinations(combinations)
 
     # Print run configuration
     parallel_doc = (
@@ -215,14 +220,12 @@ def run_combinations(
                     torch_threads,
                     device,
                     overwrite,
+                    save_train_acc,
                 ),
                 combinations,
             )
     else:
-        print(
-            f"[INFO] Running all {len(combinations)} combinations in serial "
-            "via a for-loop."
-        )
+        print(f"[INFO] Running all {len(combinations)} combinations in serial " "via a for-loop.")
         _counter = 0
         for _comb in combinations:
             run_combination(
@@ -235,13 +238,13 @@ def run_combinations(
                 torch_threads,
                 device,
                 overwrite,
+                save_train_acc,
                 _comb,
             )
             _counter += 1
             if _counter % 5 == 0:
                 print(
-                    f"[INFO] Finished running {_counter} of "
-                    f"{len(combinations)} combinations."
+                    f"[INFO] Finished running {_counter} of " f"{len(combinations)} combinations."
                 )
 
     print(f"[INFO] Finished running all {len(combinations)} combinations.")
@@ -257,6 +260,7 @@ def run_combination_with_progress(
     torch_threads,
     device,
     overwrite,
+    save_train_acc,
     combination,
 ):
     """
@@ -277,6 +281,7 @@ def run_combination_with_progress(
         torch_threads,
         device,
         overwrite,
+        save_train_acc,
         combination,
     )
 
@@ -299,6 +304,7 @@ def run_combination(
     torch_threads,
     device,
     overwrite,
+    save_train_acc,
     combination,
 ):
     """
@@ -317,6 +323,7 @@ def run_combination(
         torch_threads: Number of threads for torch operations
         device: Device to use for computation
         overwrite: Whether to overwrite existing results
+        save_train_acc: Whether to save training accuracy in results
         combination: The experiment configuration to run
     """
     # Check for mNN aggregation and adjust device if needed
@@ -347,12 +354,16 @@ def run_combination(
         f"\t[INFO] Running combination id {_id} "
         f"(presampling_fewshot_value={combination['presampling_fewshot_value']}, "
         f"proxy_method={combination['proxy_method']}, "
+        f"k={combination['k']}, "
         f"aggreg_method={combination['aggregation_method']})"
     )
 
     # Configure thread usage for torch operations
     if not serial:
         torch.set_num_threads(torch_threads)
+
+    # Find correct lambda regularization value
+    lambda_reg = backbone_lambda_regs[combination["backbone_name"]]
 
     # Create a readable description of the label mapping
     label_mapping_desc = generate_label_mapping_desc(combination["mapping"])
@@ -393,6 +404,8 @@ def run_combination(
     # Initialize containers for metrics
     accs = []
     f1s = []
+    if save_train_acc:
+        train_accs = []
 
     # Process each task in the continual learning scenario
     for task_idx in range(continual_loader.num_tasks()):
@@ -414,49 +427,108 @@ def run_combination(
         model.extend_num_classes(len(distinct_task_labels))
         model.to(device)
 
-        # Process each class in the current task
-        for label in distinct_task_labels:
-            # Apply normalization if specified for proxy selection
-            if combination["normalize_for_proxy_selection"] == "none":
-                train_data_label = train_data[train_labels == label]
-            elif combination["normalize_for_proxy_selection"] == "l2":
-                train_data_label = train_data[train_labels == label]
-                train_data_label = train_data_label / torch.norm(
-                    train_data_label, p=2, dim=1, keepdim=True
-                )
-            else:
-                raise ValueError(
-                    "Invalid value for 'normalize_for_proxy_selection'. "
-                    "Must be 'none' or 'l2'."
+        # Special handling for least-squares method which needs all class data
+        #  together
+        if combination["proxy_method"] in ["ls", "kls"]:
+            # Dictionary to collect data from all classes
+            all_class_data = {}
+
+            # First collect (normalized) data for each class
+            for label in distinct_task_labels:
+                # Apply normalization if specified for proxy selection
+                if combination["normalize_for_proxy_selection"] == "none":
+                    train_data_label = train_data[train_labels == label]
+                elif combination["normalize_for_proxy_selection"] == "l2":
+                    train_data_label = train_data[train_labels == label]
+                    train_data_label = train_data_label / torch.norm(
+                        train_data_label, p=2, dim=1, keepdim=True
+                    )
+                else:
+                    raise ValueError(
+                        "Invalid value for 'normalize_for_proxy_selection'. "
+                        "Must be 'none' or 'l2'."
+                    )
+
+                # Prefilter the data according to configuration
+                filtered_task_data = prefilter_data(
+                    train_data_label,
+                    method=combination["presampling_method"],
+                    quantile=combination["presampling_quantiles_value"],
+                    fewshot=combination["presampling_fewshot_value"],
                 )
 
-            # Prefilter the data according to configuration
-            filtered_task_data = prefilter_data(
-                train_data_label,
-                method=combination["presampling_method"],
-                quantile=combination["presampling_quantiles_value"],
-                fewshot=combination["presampling_fewshot_value"],
-            )
+                # Store the filtered data for this class
+                all_class_data[label] = filtered_task_data
 
-            # Time proxy selection
+            # Time the least-squares computation
             _start_time = time.time()
 
-            # Select proxies from the filtered data
-            task_proxies = select_proxies(
-                filtered_task_data,
-                k=combination["k"],
-                method=combination["proxy_method"],
-                seed=combination["seed"],
-            ).to(device)
+            # Compute least-squares weights using all class data
+            if combination["proxy_method"] == "ls":
+                ls_weights = compute_least_squares_weights(all_class_data, lambda_reg=lambda_reg)
+                print(
+                    f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
+                    f"took {time.time() - _start_time:.2f}s."
+                )
+            elif combination["proxy_method"] == "kls":
+                ls_weights = compute_prototype_least_squares_weights(
+                    all_class_data,
+                    k=combination["k"],
+                    lambda_reg=lambda_reg,
+                    seed=combination["seed"],
+                )
+                print(
+                    f"\t\t[INFO] Prototype least-squares weights computation for task "
+                    f"{task_idx+1} took {time.time() - _start_time:.2f}s."
+                )
 
-            print(
-                f"\t\t[INFO] Proxy selection '{combination['proxy_method']}' "
-                f"for label {label} in task {task_idx+1} took "
-                f"{time.time() - _start_time:.2f}s."
-            )
+            # Add the computed weights to the model
+            for label, ls_weight in ls_weights.items():
+                model.extend_ws(data=ls_weight.to(device), class_index=mapping[label])
+        else:
+            # Original code for processing each class with other proxy methods
+            for label in distinct_task_labels:
+                # Apply normalization if specified for proxy selection
+                if combination["normalize_for_proxy_selection"] == "none":
+                    train_data_label = train_data[train_labels == label]
+                elif combination["normalize_for_proxy_selection"] == "l2":
+                    train_data_label = train_data[train_labels == label]
+                    train_data_label = train_data_label / torch.norm(
+                        train_data_label, p=2, dim=1, keepdim=True
+                    )
+                else:
+                    raise ValueError(
+                        "Invalid value for 'normalize_for_proxy_selection'. "
+                        "Must be 'none' or 'l2'."
+                    )
 
-            # Extend model weights with the selected proxies
-            model.extend_ws(data=task_proxies, class_index=mapping[label])
+                # Prefilter the data according to configuration
+                filtered_task_data = prefilter_data(
+                    train_data_label,
+                    method=combination["presampling_method"],
+                    quantile=combination["presampling_quantiles_value"],
+                    fewshot=combination["presampling_fewshot_value"],
+                )
+
+                # Time proxy selection
+                _start_time = time.time()
+
+                # Select proxies from the filtered data
+                task_proxies = select_proxies(
+                    filtered_task_data,
+                    k=combination["k"],
+                    method=combination["proxy_method"],
+                    seed=combination["seed"],
+                ).to(device)
+
+                print(
+                    f"\t\t[INFO] Proxy selection '{combination['proxy_method']}' "
+                    f"for label {label} in task {task_idx+1} took "
+                    f"{time.time() - _start_time:.2f}s."
+                )
+
+                # Extend model weights with the selected proxies
+                model.extend_ws(data=task_proxies, class_index=mapping[label])
 
         # Prepare wandb logging dictionary
         wandb_log_dict = {
@@ -475,20 +547,34 @@ def run_combination(
             test_labels_mapped_accum = test_labels_mapped
         elif task_idx > 0:
             test_data_accum = torch.vstack([test_data_accum, test_data])
-            test_labels_mapped_accum = torch.hstack(
-                [test_labels_mapped_accum, test_labels_mapped]
-            )
+            test_labels_mapped_accum = torch.hstack([test_labels_mapped_accum, test_labels_mapped])
+
+        # If desired, get ready to compute training accuracy later
+        if save_train_acc:
+            train_labels_mapped = map_labels(train_labels, mapping, device)
+            if task_idx == 0 and continual_loader.num_tasks() > 1:
+                train_data_accum = train_data
+                train_labels_mapped_accum = train_labels_mapped
+            elif task_idx > 0:
+                train_data_accum = torch.vstack([train_data_accum, train_data])
+                train_labels_mapped_accum = torch.hstack(
+                    [train_labels_mapped_accum, train_labels_mapped]
+                )
 
         # Evaluate model performance - model is always in eval mode since we removed SGD
         model.eval()  # ...but let's be sure
         accs.append(model.accuracy(test_data, test_labels_mapped))
         f1s.append(model.f1_scores(test_data, test_labels_mapped))
+        if save_train_acc:
+            train_accs.append(model.accuracy(train_data, train_labels_mapped))
 
         elapsed_time = time.time() - start_time
         print(
             f"\t\t[INFO] Accuracy on task {task_idx+1} ({task_desc}): "
             f"{accs[task_idx]:.2f}%; {elapsed_time:.3f}s runtime"
         )
+        if save_train_acc:
+            print(f"\t\t\t[INFO] Training accuracy: {train_accs[task_idx]:.2f}%")
 
         # Log task results to wandb
         if use_wandb:
@@ -510,6 +596,8 @@ def run_combination(
     # Store results for first task
     combination["task_acc"] = accs[0]
     combination["task_f1s"] = f1s[0]
+    if save_train_acc:
+        combination["task_train_acc"] = train_accs[0]
     combination["label_mapping_desc"] = label_mapping_desc
     combination["task_split"] = continual_loader.task_splits[0]
     combination["task_desc"] = " & ".join(map(str, continual_loader.task_splits[0]))
@@ -587,7 +675,7 @@ def check_combinations(combinations: list):
     return backbone_name, dataset_name, label_mapping, task_splits
 
 
-def get_data(backbone_name, dataset_name, data_dir, label_mapping=None):
+def get_data(backbone_name: str, dataset_name: list, data_dir: str, label_mapping=None):
     """
     Load embeddings for the specified dataset(s).
 
@@ -614,40 +702,38 @@ def get_data(backbone_name, dataset_name, data_dir, label_mapping=None):
             label_mapping=label_mapping,
         )
 
-    elif len(dataset_name) == 2:
-        # Two datasets case
-        embeddings_train_1, embeddings_test_1, embedding_size_1 = get_embeddings(
-            dataset_name[0],
-            backbone_name,
-            offset=0,
-            root=data_dir,
-            splits=["train", "test"],
-            label_mapping=label_mapping,
-        )
+    elif len(dataset_name) > 1:
+        # Multiple datasets case, e.g., for MNIST&MNIST-M&USPS&SVHN ("CombiDigits")
+        embeddings_trains = []
+        embeddings_tests = []
+        offset = 0
+        embedding_size_prev = None
+        for dataset in dataset_name:
+            embeddings_train, embeddings_test, embedding_size = get_embeddings(
+                dataset,
+                backbone_name,
+                offset=offset,
+                root=data_dir,
+                splits=["train", "test"],
+                label_mapping=label_mapping,
+            )
+            if embedding_size_prev is not None:
+                assert (
+                    embedding_size_prev == embedding_size
+                ), "Embedding sizes must match across datasets!"
+                embedding_size_prev = embedding_size
+            embeddings_trains.append(embeddings_train)
+            embeddings_tests.append(embeddings_test)
+            offset += embeddings_train.number_of_classes_without_mapping
 
-        # Apply offset based on the first dataset
-        offset = embeddings_train_1.number_of_classes_without_mapping
         # TODO: I think the offset should be applied after the mapping, because
         #  e.g., for ImageNet, where we do not have classes 0-999, but only
         #  our selected few (focused ones), it will not work out this way.
-        embeddings_train_2, embeddings_test_2, embedding_size_2 = get_embeddings(
-            dataset_name[1],
-            backbone_name,
-            offset=offset,
-            root=data_dir,
-            splits=["train", "test"],
-            label_mapping=label_mapping,
-        )
+        # For MNIST&MNIST-M&USPS&SVHN ("CombiDigits") it works fine this way,
+        #  though, because we take all classes from all datasets.
 
-        # Verify embedding sizes match
-        assert (
-            embedding_size_1 == embedding_size_2
-        ), "Embedding sizes must be the same!"
-
-        # Combine datasets
-        embedding_size = embedding_size_1
-        embeddings_train = ConcatDataset([embeddings_train_1, embeddings_train_2])
-        embeddings_test = ConcatDataset([embeddings_test_1, embeddings_test_2])
+        embeddings_train = ConcatDataset(embeddings_trains)
+        embeddings_test = ConcatDataset(embeddings_tests)
 
     else:
         raise ValueError("Only one or two datasets are allowed!")
@@ -709,15 +795,10 @@ def get_mapping(continual_loader, task_idx, num_previous_classes):
     distinct_task_labels = continual_loader.task_splits[task_idx]
 
     # Create new consecutive indices for these labels
-    new_labels = np.arange(
-        num_previous_classes, num_previous_classes + len(distinct_task_labels)
-    )
+    new_labels = np.arange(num_previous_classes, num_previous_classes + len(distinct_task_labels))
 
     # Create the mapping
-    mapping = {
-        distinct_task_labels[i]: new_labels[i]
-        for i in range(len(distinct_task_labels))
-    }
+    mapping = {distinct_task_labels[i]: new_labels[i] for i in range(len(distinct_task_labels))}
 
     return distinct_task_labels, mapping
 
@@ -734,9 +815,7 @@ def map_labels(labels, mapping, device):
     Returns:
         torch.Tensor: Tensor of mapped labels
     """
-    labels_mapped = torch.tensor([mapping[_label.item()] for _label in labels]).to(
-        device
-    )
+    labels_mapped = torch.tensor([mapping[_label.item()] for _label in labels]).to(device)
     return labels_mapped
 
 

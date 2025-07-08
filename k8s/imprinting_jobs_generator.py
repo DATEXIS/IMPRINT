@@ -20,6 +20,7 @@ def generate_jobs(
     results_dir,
     config_path,
     overwrite_json_files,
+    save_train_acc,
     use_wandb,
     device_name,
     gpu_node_selector,
@@ -47,6 +48,7 @@ def generate_jobs(
         results_dir: Directory name for storing experiment results
         config_path: Path to the YAML configuration file
         overwrite_json_files: Whether to overwrite existing result JSON files
+        save_train_acc: Whether to save training accuracy in the result JSON files
         use_wandb: Whether to use Weights & Biases logging
         device_name: Computing device to use ('cpu', 'cuda', or 'mps')
         docker_digest: Docker image digest/tag to use
@@ -81,9 +83,7 @@ def generate_jobs(
     backbones = config.get("backbones", ["resnet18"])
     datasets = config.get("datasets", ["MNIST"])
     mappings_dict = config.get("label_remappings", {"none": {}})
-    task_splits_dict = config.get(
-        "task_splits", {"all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]}
-    )
+    task_splits_dict = config.get("task_splits", {"all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]})
 
     # Create all combinations of backbone, dataset, mapping, and task splits
     data_combinations = []
@@ -146,6 +146,7 @@ def generate_jobs(
         "config_path": config_path,
         "device_name": device_name,
         "overwrite": overwrite_json_files,
+        "save_train_acc": save_train_acc,
         "use_wandb": use_wandb,
         "parallel_threads": parallel_threads,
         "torch_threads": torch_threads,
@@ -223,39 +224,50 @@ def generate_jobs(
 
 
 ### Configuration #############################################################
-results_dir = (
-    "reprod"  # Will be used for results_dir and in dir name of generated jobs
-)
+results_dir = "reprod"  # Will be used for results_dir and in dir name of generated jobs
 # app_name_suffix = "fig6"
-# app_name_suffix = "imagenet"
-app_name_suffix = "non-imagenet"
+# app_name_suffix = "sec6-1"
+# app_name_suffix = "sec6-2"
+# app_name_suffix = "sec6-2kls"
+# app_name_suffix = "sec6-3-imagenet"
+# app_name_suffix = "sec6-3-imagenetkls"
+# app_name_suffix = "sec6-3-nimagenet"
+# app_name_suffix = "sec6-3-nimagenetkls"
+# app_name_suffix = "sec6-3-combdigits"
+app_name_suffix = "sec6-3-combdig-kls"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
+# config_path = "src/config/config_reprod_sec6.1.yaml"
+# config_path = "src/config/config_reprod_sec6.2.yaml"
+# config_path = "src/config/config_reprod_sec6.2_kls.yaml"
 # config_path = "src/config/config_reprod_sec6.3_imagenet.yaml"
-config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
+# config_path = "src/config/config_reprod_sec6.3_imagenet_kls.yaml"
+# config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
+# config_path = "src/config/config_reprod_sec6.3_non-imagenet_kls.yaml"
+# config_path = "src/config/config_reprod_sec6.3_combidigits.yaml"
+config_path = "src/config/config_reprod_sec6.3_combidigits_kls.yaml"
 
 clear_existing_jobs = True
 use_wandb = False
 overwrite_json_files = False  # Whether existing json files should be overwritte,
 #  i.e., whether runs should be redone (NOTE that wandb runs are not automatically
 #  overwritten, but rather duplicated then)
+save_train_acc = False  # Whether to save training accuracy in the result JSON files
 
 device_name = "cpu"
 
-max_number_of_jobs = (
-    50  # Set this higher than the expected number of data combinations
-)
+max_number_of_jobs = 10  # Set this higher than the expected number of data combinations
 # Machine requirements per job
 cpu_request = 8
 cpu_limit = 16
-parallel_threads = 1  # >1 currently does not seem to work (at least not with all data; not even with half of it)
+parallel_threads = (
+    1  # >1 currently does not seem to work (at least not with all data; not even with half of it)
+)
 torch_threads = int(cpu_request / parallel_threads)
 # NOTE: use htop on the pod to check the CPU utilization
 memory_request = "8Gi"
 memory_limit = "16Gi"
 use_cache = True  # shared memory stuff
-shared_memory_limit = (
-    "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
-)
+shared_memory_limit = "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
 gpu_node_selector = None
 
 ### End Configuration #########################################################
@@ -267,6 +279,7 @@ generate_jobs(
     results_dir=results_dir,
     config_path=config_path,
     overwrite_json_files=overwrite_json_files,
+    save_train_acc=save_train_acc,
     use_wandb=use_wandb,
     device_name=device_name,
     gpu_node_selector=gpu_node_selector,

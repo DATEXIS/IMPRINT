@@ -1,20 +1,24 @@
 {
-    "backbones": ["resnet18"],
-    "datasets": [["MNIST"]],
+    "backbones": ["resnet18", "resnet50", "vit_b_16", "swin_b"],
+    "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
     "label_remappings": {
         "none": {}
     },
     "task_splits": {
-        "short": [[0, 1, 2]]
+        "all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
     },
     "seeds": [
-        17121997,
+        14057,
+        994348,
+        23092007,
+        123456,
+        98765
     ],
     "normalize_input_data": [
-        "l2"
+        "none"
     ],
     "normalize_for_proxy_selection": [
-        "none",
+        "none"
     ],
     "presampling_methods": [
         "all",
@@ -24,15 +28,30 @@
     ],
     "presampling_fewshot_values": [
         -1,
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+        200,
+        400,
+        600,
+        800,
+        1000,
     ],
     "proxy_methods": [
         "kls",
     ],
     "ks": [
-        3,
+        -1,
+        1,
+        5,
+        20
     ],
     "normalize_weights": [
-        "l2",
+        "none",
     ],
     "aggregation_methods": [
         "max",

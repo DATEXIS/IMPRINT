@@ -14,6 +14,7 @@ import h5py
 import numpy as np
 import torch
 from tqdm import tqdm
+from transformers.modeling_outputs import ImageClassifierOutputWithNoAttention
 
 from src.data.loader import DatasetHandler
 from src.data.datasets import EmbeddingDataset
@@ -41,9 +42,7 @@ def get_embeddings_path(
     train_str = "train" if train else "test"
     if dataset_name == "ImageNet" and not train:
         train_str = "val"
-    embeddings_path = os.path.join(
-        root, "embeddings", dataset_name, backbone_name, train_str
-    )
+    embeddings_path = os.path.join(root, "embeddings", dataset_name, backbone_name, train_str)
     embeddings_filename = f"embeddings_{dataset_name}_{backbone_name}_{train_str}.h5"
     return embeddings_path, embeddings_filename
 
@@ -236,7 +235,7 @@ class EmbeddingExtractor:
         save_threshold = 1 * 1024**3  # 1 GB
 
         desc = (
-            f"Extracting {self.backbone_name.upper()} x "
+            f"Extracting {self.backbone_name} x "
             f"{self.dataset_name} ({self.train_str}) embeddings for "
         )
         desc += f"{len(self.class_focus)}" if self.class_focus else "all"
@@ -259,6 +258,8 @@ class EmbeddingExtractor:
 
                 # Compute embeddings based on backbone type
                 outputs = self.backbone(inputs)
+                if isinstance(outputs, ImageClassifierOutputWithNoAttention):
+                    outputs = outputs.logits
                 outputs = outputs.view(outputs.size(0), -1)  # Flatten the outputs
 
                 # Convert to numpy and accumulate
@@ -293,8 +294,7 @@ class EmbeddingExtractor:
             )
 
         print(
-            f"\t{total_size_in_bytes / 10**9}GB of embeddings saved to "
-            f"{self.embeddings_file}"
+            f"\t{total_size_in_bytes / 10**9}GB of embeddings saved to " f"{self.embeddings_file}"
         )
 
     def save_embeddings(self, embeddings, labels, init=False):
@@ -315,13 +315,9 @@ class EmbeddingExtractor:
                     maxshape=(None, embeddings.shape[1]),
                     dtype=np.float32,
                 )
-                f.create_dataset(
-                    "labels", data=labels, maxshape=(None,), dtype=np.int32
-                )
+                f.create_dataset("labels", data=labels, maxshape=(None,), dtype=np.int32)
             else:
-                f["embeddings"].resize(
-                    (f["embeddings"].shape[0] + embeddings.shape[0]), axis=0
-                )
+                f["embeddings"].resize((f["embeddings"].shape[0] + embeddings.shape[0]), axis=0)
                 f["embeddings"][-embeddings.shape[0] :] = embeddings
                 f["labels"].resize((f["labels"].shape[0] + labels.shape[0]), axis=0)
                 f["labels"][-labels.shape[0] :] = labels
@@ -369,9 +365,7 @@ class EmbeddingExtractor:
 
         # Determine data sources
         embeddings_location_str = "From Disk" if self.embeddings_exist else "Extracted"
-        data_location_str = (
-            "From Disk" if self.dataset_handler.data_downloaded else "Downloaded"
-        )
+        data_location_str = "From Disk" if self.dataset_handler.data_downloaded else "Downloaded"
 
         time_taken = time.time() - start_time
 

@@ -1,5 +1,5 @@
 {
-    "backbones": ["resnet18", "vit_b_16", "resnet50", "swin_b"],
+    "backbones": ["resnet18", "resnet50", "vit_b_16", "swin_b"],
     "datasets": [["ImageNet"]],
     "label_remappings": {
         "RANDOM_CLASS_REMAPPINGS": {}, # will be filled in by the script
@@ -29,7 +29,7 @@
         -1
     ],
     "proxy_methods": [
-        "kmeans"
+        "kmeans",
     ],
     "ks": [
         1,

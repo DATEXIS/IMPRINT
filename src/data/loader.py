@@ -24,24 +24,34 @@ import torchvision.datasets as datasets
 from rasterio import RasterioIOError
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import transforms
+from transformers import AutoImageProcessor
 
 from src.models.backbone import backbone_weights
 from src.utils.helpers import set_all_seeds
+from src.data.mnist_m import MNISTM
 
 load_dotenv()
 
 available_datasets = [
-    "CIFAR10",
-    "FashionMNIST",
     "MNIST",
+    "FashionMNIST",
+    "CIFAR10",
+    "MNIST-M",
+    "USPS",
+    "SVHN",
+    # "CIFAR100",
+    # "Places365",
     "ImageNet",
 ]
 
 torch_datasets = {
-    "CIFAR10": datasets.CIFAR10,
-    "FashionMNIST": datasets.FashionMNIST,
-    "KMNIST": datasets.KMNIST,
     "MNIST": datasets.MNIST,
+    "FashionMNIST": datasets.FashionMNIST,
+    "CIFAR10": datasets.CIFAR10,
+    "USPS": datasets.USPS,
+    "SVHN": datasets.SVHN,
+    # "CIFAR100": datasets.CIFAR100,
+    # "Places365": datasets.Places365,
 }
 
 
@@ -64,20 +74,18 @@ class DatasetHandler:
         root: str = "./data",
         train: bool = False,
         batch_size: int = 64,
-        split_ratio: float = 0.8,
         seed: int = 42,
     ):
         """
         Initialize a dataset handler.
 
         Args:
-            dataset_name: Name of the dataset to load
-            backbone_name: Name of the backbone model to use for embeddings
-            root: Root directory to store the raw data
-            train: Whether to load training set (True) or test set (False)
-            batch_size: Batch size for the DataLoader
-            split_ratio: Ratio to split the dataset into training and test sets
-            seed: Random seed for reproducibility
+                dataset_name: Name of the dataset to load
+                backbone_name: Name of the backbone model to use for embeddings
+                root: Root directory to store the raw data
+                train: Whether to load training set (True) or test set (False)
+                batch_size: Batch size for the DataLoader
+                seed: Random seed for reproducibility
         """
 
         self.data_loader = None
@@ -86,17 +94,16 @@ class DatasetHandler:
         self.root = root
         self.train = train
         self.batch_size = batch_size
-        self.split_ratio = split_ratio
         self.seed = seed  # Store the seed for use in data loading
 
         self.train_str = "train" if self.train else "test"
-        if self.dataset_name == "ImageNet" and not self.train:
+        if self.dataset_name == "Places365" and self.train:
+            self.train_str = "train-standard"
+        if self.dataset_name in ["Places365", "ImageNet"] and not self.train:
             # For ImageNet, there is no test set. So we have to use the
             #  validation set here.
             self.train_str = "val"
-        self.raw_data_path = os.path.join(
-            self.root, "raw", self.dataset_name, self.train_str
-        )
+        self.raw_data_path = os.path.join(self.root, "raw", self.dataset_name, self.train_str)
 
         # Check if the dataset is available on disk
         self.data_downloaded = os.path.exists(self.raw_data_path) and (
@@ -115,25 +122,54 @@ class DatasetHandler:
 
         if self.dataset_name in torch_datasets:
             if not self.data_downloaded:
-                print(
-                    f"\tDownloading {self.dataset_name} ({self.train_str}) "
-                    "raw dataset..."
-                )
+                print(f"\tDownloading {self.dataset_name} ({self.train_str}) " "raw dataset...")
             else:
                 print(
                     f"\t{self.dataset_name} ({self.train_str}) raw dataset "
                     "already exists. Loading from disk..."
                 )
 
-            dataset = torch_datasets[self.dataset_name](
-                root=self.raw_data_path,
-                train=self.train,
-                download=True,
+            if self.dataset_name == "Places365":
+                dataset = torch_datasets[self.dataset_name](
+                    root=self.raw_data_path,
+                    split=self.train_str,
+                    download=True,
+                    small=True,  # 256x256 images
+                )
+            elif self.dataset_name == "SVHN":
+                dataset = torch_datasets[self.dataset_name](
+                    root=self.raw_data_path,
+                    split=self.train_str,
+                    download=True,
+                )
+            else:
+                dataset = torch_datasets[self.dataset_name](
+                    root=self.raw_data_path,
+                    train=self.train,
+                    download=True,
+                )
+        elif self.dataset_name == "MNIST-M":
+            if self.data_downloaded:
+                print(
+                    f"	{self.dataset_name} ({self.train_str}) raw dataset "
+                    "already exists. Loading from disk..."
+                )
+
+            dataset_path = os.path.join(self.root, "raw", self.dataset_name, self.train_str)
+
+            if not os.path.exists(dataset_path):
+                os.makedirs(dataset_path)
+
+            dataset = MNISTM(
+                root=dataset_path,
+                train=self.train,  # True for training set, False for test set
+                transform=None,
+                target_transform=None,
+                download=not (self.data_downloaded),
             )
+
         elif self.dataset_name == "ImageNet":
-            dataset_path = self.download_from_imagenet(
-                self.raw_data_path, split=self.train_str
-            )
+            dataset_path = self.download_from_imagenet(self.raw_data_path, split=self.train_str)
             dataset = datasets.ImageNet(root=dataset_path, split=self.train_str)
         else:
             raise ValueError(
@@ -172,74 +208,42 @@ class DatasetHandler:
 
     def get_image_transformation(self):
         # Initialize Weight Transforms for correct preprocessing
-        weights = backbone_weights[self.backbone_name]
+        # Check if we're using a HuggingFace model
+        if self.backbone_name == "convnextv2-femto-1k-224":
 
-        if self.dataset_name in [
-            "FashionMNIST",
-            "MNIST",
-            "ImageNet",
-        ]:
-            transform = transforms.Compose(
-                [transforms.Grayscale(num_output_channels=3), weights.transforms()]
-            )
+            # Get image processor
+            processor = AutoImageProcessor.from_pretrained("facebook/convnextv2-femto-1k-224")
+
+            # Create a transformation that uses the processor directly
+            def transform_with_processor(img):
+                # Convert grayscale to RGB if needed
+                if self.dataset_name in ["FashionMNIST", "MNIST", "USPS"]:
+                    # Convert PIL Image to RGB if it's grayscale
+                    if img.mode == "L":
+                        img = img.convert("RGB")
+
+                # Process the image using the Hugging Face processor
+                processed = processor(images=img, return_tensors="pt")
+                # Return just the pixel_values tensor and remove the batch dimension
+                return processed.pixel_values.squeeze(0)
+
+            return transform_with_processor
         else:
-            transform = weights.transforms()
+            # Standard torchvision weights handling
+            weights = backbone_weights[self.backbone_name]
 
-        return transform
-
-    def download_and_extract_zip(self, url, dataset_path, split=False):
-
-        if self.data_downloaded:
-            print(
-                f"\t{self.dataset_name} ({self.train_str}) raw dataset "
-                "already exists. Loading from disk..."
-            )
-
-        else:
-
-            if self.dataset_name[:5] == "CLEAR":
-                # Fixing the CLEAR dataset structure
-                dataset_path = os.path.join(self.root, "raw", self.dataset_name)
-
-            if split:
-                dataset_path = os.path.join(self.root, "raw", self.dataset_name)
-
-            if not os.path.exists(dataset_path):
-                os.makedirs(dataset_path)
-
-            temp_dir = os.path.join(self.root, "temp")
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
-
-            zip_path = os.path.join(temp_dir, f"{self.dataset_name}.zip")
-            if not os.path.exists(zip_path):
-                print(
-                    f"\tDownloading {self.dataset_name} ({self.train_str}) from {url}..."
-                )
-                with requests.get(url, stream=True) as r:
-                    with open(zip_path, "wb") as f:
-                        shutil.copyfileobj(r.raw, f)
-
-            # Extract the zip file
-            with zipfile.ZipFile(zip_path, "r") as zip_ref:
-                print(
-                    f"Extracting {self.dataset_name} ({self.train_str}) to {dataset_path}"
-                )
-                zip_ref.extractall(dataset_path)
-
-            # Remove the temp directory
-            shutil.rmtree(temp_dir)
-
-            if split:
-                self.split_dataset(dataset_path)
-                dataset_path = os.path.join(
-                    self.root, "raw", self.dataset_name, self.train_str
+            if self.dataset_name in [
+                "FashionMNIST",
+                "MNIST",
+                "USPS",
+            ]:  # grayscale datasets
+                transform = transforms.Compose(
+                    [transforms.Grayscale(num_output_channels=3), weights.transforms()]
                 )
             else:
-                # After extraction, check and clean images
-                self.check_and_clean_images(self.raw_data_path)
+                transform = weights.transforms()
 
-        return dataset_path
+        return transform
 
     def download_from_imagenet(self, dataset_path, split="val"):
 
@@ -289,83 +293,3 @@ class DatasetHandler:
         print(f"Downloaded {self.dataset_name}-{split} to {dataset_path}")
 
         return dataset_path
-
-    def split_dataset(
-        self,
-        dataset_path,
-    ):
-        # Set seed before random operations to ensure reproducibility
-        set_all_seeds(self.seed)
-
-        class_folders = os.listdir(dataset_path)
-
-        train_path = os.path.join(dataset_path, "train")
-        test_path = os.path.join(dataset_path, "test")
-        if not os.path.exists(train_path):
-            os.makedirs(train_path)
-        if not os.path.exists(test_path):
-            os.makedirs(test_path)
-
-        for class_folder in class_folders:
-            class_folder_path = os.path.join(dataset_path, class_folder)
-            if os.path.isdir(class_folder_path):
-                images = os.listdir(class_folder_path)
-                num_images = len(images)
-                # This operation depends on PyTorch's random state
-                shuffled_indices = torch.randperm(num_images).tolist()
-                split_idx = int(num_images * self.split_ratio)
-
-                train_class_path = os.path.join(train_path, class_folder)
-                test_class_path = os.path.join(test_path, class_folder)
-                if not os.path.exists(train_class_path):
-                    os.makedirs(train_class_path)
-                if not os.path.exists(test_class_path):
-                    os.makedirs(test_class_path)
-
-                for i, idx in enumerate(shuffled_indices):
-                    image = images[idx]
-                    image_path = os.path.join(class_folder_path, image)
-                    if os.path.isfile(image_path):
-                        if i < split_idx:
-                            shutil.move(image_path, train_class_path)
-                        else:
-                            shutil.move(image_path, test_class_path)
-
-                # recursively remove old class folder with all the remaining content
-                shutil.rmtree(class_folder_path)
-
-            else:
-                # If the file is not a directory, delete it
-                os.remove(class_folder_path)
-
-        # After extraction, check and clean images
-        self.check_and_clean_images(train_path)
-        self.check_and_clean_images(test_path)
-
-    def check_and_clean_images(self, path):
-        """
-        Traverses the extracted dataset directories, attempts to open each image,
-        and deletes any image files that are corrupt.
-        """
-        print(f"Checking for corrupt images in {path} ...")
-        num_checked = 0
-        num_deleted = 0
-        for root, dirs, files in os.walk(path):
-            for file in files:
-                num_checked += 1
-                file_path = os.path.join(root, file)
-                # Only check image files
-                if file.lower().endswith((".tif", ".tiff", ".jpg", ".jpeg", ".png")):
-                    try:
-                        with rasterio.open(file_path) as src:
-                            src.read()
-                    except (RasterioIOError, ValueError) as e:
-                        print(f"Corrupt image found and deleted: {file_path}")
-                        os.remove(file_path)
-                        num_deleted += 1
-        if num_checked == 0:
-            print("No images to check and clean at all found?! :O")
-        elif num_deleted == 0:
-            print("No corrupt images found.")
-        else:
-            print(f"Deleted {num_deleted} corrupt image(s).")

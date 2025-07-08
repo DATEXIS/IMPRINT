@@ -42,12 +42,19 @@ def main():
     # Set datasets
     datasets_list = available_datasets
     # datasets_list = ["MNIST"]
+    # datasets_list = ["CIFAR100"]
+    # datasets_list = ["Places365"]
+    # datasets_list = ["MNIST-M"]
+    # datasets_list = ["USPS"]
+    # datasets_list = ["SVHN"]
+    # datasets_list = ["ImageNet"]
 
     # Set backbones
     backbones_list = available_backbones
     # backbones_list = ["resnet18"]
+    # backbones_list = ["convnextv2-femto-1k-224"]
 
-    device_name = "cuda"  # "cpu"
+    device_name = "cuda"  #  "cuda"  # "cpu"
     batch_size = 64
 
     class_focus = {
@@ -73,20 +80,16 @@ def main():
     ]
 
     for dataset_name in datasets_list:
-        raw_data_root = (
-            "imagenet-data" if dataset_name == "ImageNet" else "imprinting-reproduce"
-        )
-        # raw_data_root = "data"
+        raw_data_root = "imagenet-data" if dataset_name == "ImageNet" else "imprinting-reproduce"
+        # raw_data_root = "data" # for local testing
 
         embedding_root = raw_data_root
         for backbone_idx, backbone_name in enumerate(backbones_list):
-            for train in [False, True]:  # [True, False]:
+            for train in [False, True]:
                 train_str = "train" if train else "test"
                 if dataset_name == "ImageNet" and not train:
                     train_str = "val"
-                print(
-                    f"Running {backbone_name.upper()} x {dataset_name} ({train_str})"
-                )
+                print(f"Running {backbone_name} x {dataset_name} ({train_str})")
 
                 extractor = EmbeddingExtractor(
                     device_name=device_name,

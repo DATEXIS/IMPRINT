@@ -1,5 +1,5 @@
 {
-    "backbones": ["resnet18", "vit_b_16"],
+    "backbones": ["resnet18", "resnet50", "vit_b_16", "swin_b"],
     "datasets": [["MNIST"], ["FashionMNIST"], ["CIFAR10"]],
     "label_remappings": {
         "none": {}
@@ -36,6 +36,8 @@
         "kmeans",
         "kmedoids",
         "mean",
+        "ls",
+        "kls",
         "cov_max",
         "random",
         "fps",

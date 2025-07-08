@@ -39,24 +39,57 @@ def main():
     if len(sys.argv) == 1:
         print("Using default parameters.")
         args = {
-            "data_and_res_dir": "data",
+            "data_and_res_dir": "imprinting-reproduce",  # "data",
             "backbone_name": "resnet18",
-            "dataset_name": ["ImageNet"],  # ["MNIST"],
-            "mapping_name": "map1-0",  # "none",
+            # "dataset_name": ["MNIST"],  # ["ImageNet"],
+            "dataset_name": ["MNIST", "MNIST-M", "USPS", "SVHN"],
+            # "mapping_name": "none",  # "map1-0",
+            "mapping_name": "combined_digits",
+            # "mapping": {},  # { 214: 0, 47: 1, 528: 2, 496: 3, 723: 4, 97: 5, 532: 6, 782: 7, 412: 8, 992: 9},
             "mapping": {
-                214: 0,
-                47: 1,
-                528: 2,
-                496: 3,
-                723: 4,
-                97: 5,
-                532: 6,
-                782: 7,
-                412: 8,
-                992: 9,
-            },  # {},
-            "task_name": "all",
-            "task_splits": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]],
+                0: 0,
+                10: 0,
+                20: 0,
+                30: 0,
+                1: 1,
+                11: 1,
+                21: 1,
+                31: 1,
+                2: 2,
+                12: 2,
+                22: 2,
+                32: 2,
+                3: 3,
+                13: 3,
+                23: 3,
+                33: 3,
+                4: 4,
+                14: 4,
+                24: 4,
+                34: 4,
+                5: 5,
+                15: 5,
+                25: 5,
+                35: 5,
+                6: 6,
+                16: 6,
+                26: 6,
+                36: 6,
+                7: 7,
+                17: 7,
+                27: 7,
+                37: 7,
+                8: 8,
+                18: 8,
+                28: 8,
+                38: 8,
+                9: 9,
+                19: 9,
+                29: 9,
+                39: 9,
+            },
+            "task_name": "short",
+            "task_splits": [[0, 1, 2]],
             "combinations_slice": [0, 100],
             "use_wandb": False,
             "parallel_threads": 1,
@@ -64,7 +97,8 @@ def main():
             "use_cache": True,
             "device_name": "cpu",
             "overwrite": True,
-            "config_path": "src/config/config_reprod_sec6.3_imagenet.yaml",  # "src/config/config.yaml",
+            "save_train_acc": True,
+            "config_path": "src/config/config.yaml",  # "src/config/config_reprod_sec6.3_imagenet.yaml",
         }
         # Using temp results dir for testing
         results_dir = "results_temp"
@@ -91,9 +125,7 @@ def main():
     backbones = config.get("backbones", ["resnet18"])
     datasets = config.get("datasets", [["MNIST"]])
     remappings_dict = config.get("label_remappings", {"none": {}})
-    task_splits_dict = config.get(
-        "task_splits", {"all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]}
-    )
+    task_splits_dict = config.get("task_splits", {"all": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]})
 
     # Overwrite with CLI arguments
     if "backbone_name" in args:
@@ -152,9 +184,7 @@ def main():
         #  dataset building blocks (e.g., MNIST and FashionMNIST could be
         #  combined into one new dataset using mappings and/or task_splits).
         for name in dataset:
-            embeddings_path = os.path.join(
-                args["data_and_res_dir"], "embeddings", name, backbone
-            )
+            embeddings_path = os.path.join(args["data_and_res_dir"], "embeddings", name, backbone)
             if not os.path.exists(embeddings_path):
                 print(
                     f"WARNING: Embeddings for {name} with {backbone} "
@@ -176,10 +206,7 @@ def main():
         slice_start, slice_end = args["combinations_slice"]
         combinations_to_run = combinations[slice_start:slice_end]
 
-        print(
-            f"Running {len(combinations_to_run)} of {len(combinations)} "
-            "combinations."
-        )
+        print(f"Running {len(combinations_to_run)} of {len(combinations)} " "combinations.")
 
         # Execute experiment combinations for this specific configuration
         run_combinations(
@@ -192,6 +219,7 @@ def main():
             use_cache=args["use_cache"],
             device_name=args["device_name"],
             overwrite=args["overwrite"],
+            save_train_acc=args["save_train_acc"],
         )
 
 
@@ -322,6 +350,12 @@ def parse_input():
         help="Whether to overwrite existing result files",
     )
     parser.add_argument(
+        "--save_train_acc",
+        default=True,
+        type=lambda x: x.lower() == "true",
+        help="Whether to save training accuracy during experiments",
+    )
+    parser.add_argument(
         "--config",
         default="src/config/config.yaml",
         type=str,
@@ -372,6 +406,7 @@ def parse_input():
         "use_cache": args.uc,
         "device_name": args.dn,
         "overwrite": args.o,
+        "save_train_acc": args.save_train_acc,
         "config_path": args.config,
     }
 
