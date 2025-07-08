@@ -66,8 +66,7 @@ class BackboneHandler:
         """
         if backbone_name not in available_backbones:
             raise ValueError(
-                f"Backbone {backbone_name} not supported. "
-                f"Choose from: {available_backbones}"
+                f"Backbone {backbone_name} not supported. " f"Choose from: {available_backbones}"
             )
 
         self.backbone_name = backbone_name
@@ -106,9 +105,7 @@ class BackboneHandler:
             return backbone
 
         # Load backbone from torchvision
-        backbone = getattr(models, self.backbone_name)(
-            weights=backbone_weights[self.backbone_name]
-        )
+        backbone = getattr(models, self.backbone_name)(weights=backbone_weights[self.backbone_name])
 
         backbone = backbone.to(self.device)
         backbone.eval()
