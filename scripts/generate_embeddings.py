@@ -46,7 +46,8 @@ def main():
     # datasets_list = ["Places365"]
     # datasets_list = ["MNIST-M"]
     # datasets_list = ["USPS"]
-    # datasets_list = ["MNIST-M", "USPS", "SVHN"]
+    # datasets_list = ["SVHN"]
+    # datasets_list = ["ImageNet"]
 
     # Set backbones
     backbones_list = available_backbones
@@ -84,7 +85,7 @@ def main():
 
         embedding_root = raw_data_root
         for backbone_idx, backbone_name in enumerate(backbones_list):
-            for train in [False, True]:  # [True, False]:
+            for train in [False, True]:
                 train_str = "train" if train else "test"
                 if dataset_name == "ImageNet" and not train:
                     train_str = "val"

@@ -3,9 +3,11 @@ import numpy as np
 import torch
 import pandas as pd
 from sklearn.model_selection import ParameterGrid
+from torch.utils.data import DataLoader
 
 from src.data.datasets import EmbeddingDataset
 from src.data.embeddings import get_embeddings_path
+from src.experiments.runner import get_data
 from src.nc.neural_collapse import NeuralCollapse
 from src.experiments.imagenet.prep import RANDOM_CLASS_REMAPPINGS
 
@@ -18,7 +20,7 @@ def main():
     """
     # Set up the paths and configuration
     print("Setting up paths and configuration")
-    root = "./data"
+    root = "./imprinting-reproduce"
     nc_dir = "./analysis/nc_results"
     torch.set_num_threads(4)
 
@@ -26,9 +28,18 @@ def main():
     if not os.path.exists(nc_dir):
         os.makedirs(nc_dir)
 
-    # Define parameter combinations for standard datasets (no remapping needed)
+    # Define parameter combinations for "standard" datasets
+    # For MNIST, FashionMNIST, and CIFAR10, we use all classes (0-9) as is.
     standard_parameters = {
-        "dataset_name": ["MNIST", "FashionMNIST", "CIFAR10"],
+        "dataset_names_with_label_mappings": [
+            (["MNIST"], {}),
+            (["FashionMNIST"], {}),
+            (["CIFAR10"], {}),
+            (
+                ["MNIST", "MNIST-M", "USPS", "SVHN"],
+                {i + j * 10: i for i in range(10) for j in range(4)},
+            ),  # the MNIST&MNIST-M&USPS&SVHN ("CombiDigits") dataset
+        ],
         "backbone_name": ["resnet18", "resnet50", "vit_b_16", "swin_b"],
     }
 
@@ -43,11 +54,10 @@ def main():
 
 def process_standard_datasets(parameters, root, nc_dir):
     """
-    Process standard datasets without remapping.
-    For MNIST, FashionMNIST, and CIFAR10, we use all classes (0-9) as is.
+    Process "standard" datasets.
     """
-    print("\n=== Processing standard datasets (MNIST, FashionMNIST, CIFAR10) ===")
-    print("Note: Using standard class assignments (0-9) for these datasets")
+    datasets = [str(l[0]) for l in parameters["dataset_names_with_label_mappings"]]
+    print(f"\n=== Processing standard datasets {datasets} ===")
 
     # Generate all combinations of parameters
     combinations = list(ParameterGrid(parameters))
@@ -63,29 +73,22 @@ def process_standard_datasets(parameters, root, nc_dir):
     for idx, combination in enumerate(combinations):
         print(f"Running combination {idx+1}/{len(combinations)}")
 
-        dataset_name = combination["dataset_name"]
+        dataset, label_mapping = combination["dataset_names_with_label_mappings"]
+        dataset_name = "&".join(dataset)
         backbone = combination["backbone_name"]
 
         try:
-            # Get embeddings path for the current combination
-            embeddings_path, embeddings_filename = get_embeddings_path(
-                root, dataset_name, backbone, train=True
+            embedding_size, embeddings_train, _ = get_data(
+                backbone_name=backbone,
+                dataset_name=dataset,
+                data_dir=root,
+                label_mapping=label_mapping,
             )
 
-            # Load embeddings dataset - no label mapping needed for standard datasets
-            embeddings_file = os.path.join(embeddings_path, embeddings_filename)
-            if not os.path.exists(embeddings_file):
-                print(
-                    f"Skipping {dataset_name} with {backbone} - "
-                    f"embeddings file not found at {embeddings_file}"
-                )
-                continue
-
-            embeddings_dataset = EmbeddingDataset(embeddings_file)
-
             # Extract embeddings and labels
-            embeddings = embeddings_dataset[:][0]
-            labels = embeddings_dataset[:][1]
+            embeddings, labels = next(
+                iter(DataLoader(embeddings_train, batch_size=len(embeddings_train)))
+            )
 
             # Filter out invalid labels if any
             if -1 in labels:
@@ -93,10 +96,9 @@ def process_standard_datasets(parameters, root, nc_dir):
                 embeddings = embeddings[wanted_labels]
                 labels = labels[wanted_labels]
 
-            # Apply normalization
+            # Apply normalizationl
             embeddings = embeddings / (
-                torch.norm(embeddings, dim=1, keepdim=True)
-                + torch.finfo(embeddings.dtype).eps
+                torch.norm(embeddings, dim=1, keepdim=True) + torch.finfo(embeddings.dtype).eps
             )
 
             # Calculate neural collapse metrics
@@ -138,9 +140,7 @@ def process_imagenet_with_remapping(root, nc_dir):
     ImageNet uses 100 different random label remappings (10 configurations × 10 variations).
     """
     print("\n=== Processing ImageNet with 100 different label remappings ===")
-    print(
-        "Processing 10 configurations (1-10 classes per label) × 10 random variations each"
-    )
+    print("Processing 10 configurations (1-10 classes per label) × 10 random variations each")
 
     # Define backbones to test with ImageNet
     backbones = ["resnet18", "resnet50", "vit_b_16", "swin_b"]
@@ -172,9 +172,7 @@ def process_imagenet_with_remapping(root, nc_dir):
 
         # Process each mapping configuration (1-10 classes per label)
         for n_classes_per_label in range(1, 11):
-            print(
-                f"Processing ImageNet with {backbone}, {n_classes_per_label} classes per label"
-            )
+            print(f"Processing ImageNet with {backbone}, {n_classes_per_label} classes per label")
 
             # Process each random remapping variation (10 for each configuration)
             for remapping_idx, label_mapping in enumerate(

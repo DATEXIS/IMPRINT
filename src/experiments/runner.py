@@ -703,7 +703,7 @@ def get_data(backbone_name: str, dataset_name: list, data_dir: str, label_mappin
         )
 
     elif len(dataset_name) > 1:
-        # Multiple datasets case, e.g., for MNIST&MNIST-M&USPS&SVHN
+        # Multiple datasets case, e.g., for MNIST&MNIST-M&USPS&SVHN ("CombiDigits")
         embeddings_trains = []
         embeddings_tests = []
         offset = 0
@@ -729,8 +729,8 @@ def get_data(backbone_name: str, dataset_name: list, data_dir: str, label_mappin
         # TODO: I think the offset should be applied after the mapping, because
         #  e.g., for ImageNet, where we do not have classes 0-999, but only
         #  our selected few (focused ones), it will not work out this way.
-        # For MNIST&MNIST-M&USPS&SVHN it works fine this way, though, because
-        #  we take all classes from all datasets.
+        # For MNIST&MNIST-M&USPS&SVHN ("CombiDigits") it works fine this way,
+        #  though, because we take all classes from all datasets.
 
         embeddings_train = ConcatDataset(embeddings_trains)
         embeddings_test = ConcatDataset(embeddings_tests)

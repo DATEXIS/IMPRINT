@@ -103,7 +103,7 @@ class ClassContinualDataset:
 
         # Handle both single and concatenated datasets
         if isinstance(self.train_dataset, ConcatDataset):
-            # For concatenated datasets (e.g., MNIST&MNIST-M&USPS&SVHN)
+            # For concatenated datasets (e.g., MNIST&MNIST-M&USPS&SVHN ("CombiDigits"))
             task_train_datasets = []
             task_test_datasets = []
             for dataset in self.train_dataset.datasets:
