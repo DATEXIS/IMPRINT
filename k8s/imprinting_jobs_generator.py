@@ -243,8 +243,8 @@ app_name_suffix = "sec6-3-combdig-kls"
 # config_path = "src/config/config_reprod_sec6.3_imagenet_kls.yaml"
 # config_path = "src/config/config_reprod_sec6.3_non-imagenet.yaml"
 # config_path = "src/config/config_reprod_sec6.3_non-imagenet_kls.yaml"
-# config_path = "src/config/config_reprod_sec6.3_combined_digits.yaml"
-config_path = "src/config/config_reprod_sec6.3_combined_digits_kls.yaml"
+# config_path = "src/config/config_reprod_sec6.3_combidigits.yaml"
+config_path = "src/config/config_reprod_sec6.3_combidigits_kls.yaml"
 
 clear_existing_jobs = True
 use_wandb = False
