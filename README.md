@@ -37,7 +37,7 @@ pip install -e .
 python scripts/generate_embeddings.py
 
 # Now you can run experiments
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.1.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
 ```
 
 ### Docker and Kubernetes Setup
@@ -69,26 +69,26 @@ To reproduce all the experiments from our paper, run the following configuration
 
 ```bash
 # Section 6.1
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.1.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
 
 # Figure 6
 python scripts/run_imprinting_experiments.py --config src/config/config_reprod_fig6.yaml
 
 # Section 6.2
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.2.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.2_kls.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec2.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec2_kls.yaml
 
 # Section 6.3 for ImageNet
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_imagenet.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_imagenet_kls.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_imagenet.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_imagenet_kls.yaml
 
 # Section 6.3 for CombiDigits dataset
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_combidigits.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_combidigits_kls.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_combidigits.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_combidigits_kls.yaml
 
 # Section 6.3 for other datasets
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_non-imagenet.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_non-imagenet_kls.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_non-imagenet.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_non-imagenet_kls.yaml
 ```
 
 ### Neural Collapse Experiments
