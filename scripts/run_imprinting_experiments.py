@@ -98,7 +98,7 @@ def main():
             "device_name": "cpu",
             "overwrite": True,
             "save_train_acc": True,
-            "config_path": "src/config/config.yaml",  # "src/config/config_reprod_sec6.3_imagenet.yaml",
+            "config_path": "src/config/config.yaml",  # "src/config/config_reprod_subsec3_imagenet.yaml",
         }
         # Using temp results dir for testing
         results_dir = "results_temp"

@@ -2,7 +2,7 @@
 This repository contains code for the paper **Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation**.
 [[Preprint](https://arxiv.org/abs/2503.14572)]
 
-## Overview of our Imprinting Framework
+## Overview of our `IMPRINT` Framework
 We test frozen, neurally collapsed foundation models (`FMs`) on transferability to new classes.
 The weight generator (`GEN`) uses training data from a novel task `T` to generate one or more weight vectors (proxies) per class $1, \dotsc, c$ given in `T`.
 The final output of the test data in `T` is computed by an aggregation (`AGG`) mechanism.
@@ -36,15 +36,15 @@ pip install -e .
 # Generate embeddings (required before running experiments)
 python scripts/generate_embeddings.py
 
-# Now you can run experiments
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.1.yaml
+# Now you can run experiments, e.g., reproduce the results from the first results subsection
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
 ```
 
 ### Docker and Kubernetes Setup
 Build a Docker container via
 
 ```bash
-docker build -t multi-imprinting .
+docker build -t imprinting .
 ```
 
 and then, for large-scale parallel execution, use (for example) the Kubernetes job generator:
@@ -68,38 +68,38 @@ The jobs will run in parallel on your Kubernetes cluster, with results stored in
 To reproduce all the experiments from our paper, run the following configuration files using the `run_imprinting_experiments.py` script:
 
 ```bash
-# Section 6.1
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.1.yaml
+# Section 5.1
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
 
 # Figure 6
 python scripts/run_imprinting_experiments.py --config src/config/config_reprod_fig6.yaml
 
-# Section 6.2
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.2.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.2_kls.yaml
+# Section 5.2
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec2.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec2_kls.yaml
 
-# Section 6.3 for ImageNet
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_imagenet.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_imagenet_kls.yaml
+# Section 5.3 for ImageNet
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_imagenet.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_imagenet_kls.yaml
 
-# Section 6.3 for CombiDigits dataset
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_combidigits.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_combidigits_kls.yaml
+# Section 5.3 for CombiDigits dataset
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_combidigits.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_combidigits_kls.yaml
 
-# Section 6.3 for other datasets
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_non-imagenet.yaml
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_sec6.3_non-imagenet_kls.yaml
+# Section 5.3 for other datasets
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_non-imagenet.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec3_non-imagenet_kls.yaml
 ```
 
 ### Neural Collapse Experiments
 
-The neural collapse experiments provide insights into the benefits of multi-proxy imprinting and are shown in section 6.3 of the paper:
+The neural collapse experiments provide insights into the benefits of multi-proxy imprinting and are shown in the third results subsection of the paper:
 
 ```bash
 python scripts/run_neural_collapse_experiments.py
 ```
 
-This script calculates the NC1 metric for MNIST, FashionMNIST, CIFAR10, the MNIST&MNIST-M&USPS&SVHN mixed set ("CombiDigits"), and ImageNet with different class remappings.
+This script calculates the NC1 metric for MNIST, FashionMNIST, CIFAR10, the MNIST&MNIST-M&USPS&SVHN mixed set ("CombiDigits"), and ImageNet with different label remappings.
 
 ### Analysis and Visualization
 
@@ -116,8 +116,8 @@ jupyter notebook analysis.ipynb
 The critical difference diagram generation in `cd_diag.py` performs statistical significance testing to compare different imprinting configurations across multiple datasets and backbones.
 
 ## Results
-Within the above-described framework, we find the best method by investigating average rank, average accuracy, and statistical significance in ranking (dis-)agreements through critical difference diagrams with $p<0.05$.
-The rankings are across four `FMs`, `resnet18`, `resnet50`, `vit_b_16`, and `swin_b`, and twelve tasks `T` coming from `MNIST`, `FashionMNIST`, and `CIFAR-10`.
+Within `IMPRINT`, we find the best method by investigating average rank, average accuracy, and statistical significance in ranking (dis-)agreements through critical difference diagrams with $p<0.05$.
+The rankings are across four `FMs` (`resnet18`, `resnet50`, `vit_b_16`, and `swin_b`), all of which are pretrained on `ImageNet-1K`, and twelve transfer learning tasks `T` coming from `MNIST`, `FashionMNIST`, and `CIFAR-10`.
 
 ### Comparison to Previous Methods
 
@@ -135,7 +135,7 @@ It uses multiple proxies per class. Here, $k=20$ is chosen.
 
 ### Connection to Neural Collapse
 
-The central effect of using multi-proxy imprinting with k-means becomes clear when synthetic ImageNet tasks (class distributions are multi-modal by combining $d$ classes into one) are plotted against the number of proxies $k$ used.
+The central effect of using multi-proxy imprinting with $k$-means becomes clear when synthetic ImageNet tasks (class distributions are multi-modal by combining $d$ classes into one) are plotted against the number of proxies $k$ used.
 In all four plots, peaks in accuracy at $k=d$ can be inferred.
 Accuracies of the tasks containing all of `MNIST`, `FashionMNIST`, `CIFAR-10`, resp. `CombiDigits` at once are shown in dotted lines and show that using one proxy (the `mean`) is not optimal, as the `FM` seems to not be fully collapsed on these OOD classes.
 This confirms the connection between the effect of using multiple proxies and the collapse of the data.
