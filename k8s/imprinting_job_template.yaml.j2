@@ -4,17 +4,17 @@ kind: Job
 metadata:
   name: {{ app_name|lower() }}-{{ backbone_name[:8]|lower|replace('_', '-') }}-{{ dataset_name_str[:7]|lower|replace('&', '-') }}-{{ mapping_name|lower|replace('_', '-') }}-{{ task_name|lower|replace('_', '-') }}-{{ combinations_slice[0] }}-{{ combinations_slice[1] }}
   labels:
-    app: multi-imprinting
+    app: imprinting
 spec:
   template:
     metadata:
       labels:
-        app: multi-imprinting
+        app: imprinting
     spec:
       priorityClassName: normal
       containers:
-        - name: multi-imprinting
-          image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
+        - name: imprinting
+          image: registry.datexis.com/jwesterhoff/imprinting:latest
           command: ["python", "scripts/run_imprinting_experiments.py",
                     "--data_and_res_dir", "/app/imprinting-reproduce",
                     "--results_dir", "{{ results_dir }}",

@@ -3,17 +3,17 @@ kind: Job
 metadata:
   name: generate-embeddings-reprod
   labels:
-    app: multi-imprinting
+    app: imprinting
 spec:
   template:
     metadata:
       labels:
-        app: multi-imprinting
+        app: imprinting
     spec:
       priorityClassName: normal
       containers:
-        - name: multi-imprinting
-          image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
+        - name: imprinting
+          image: registry.datexis.com/jwesterhoff/imprinting:latest
           imagePullPolicy: Always # to force pulling the newest image
           command: ["python", "scripts/generate_embeddings.py"]
           env:
@@ -76,8 +76,8 @@ spec:
   backoffLimit: 1
 
 # NOTES:
-# - to build, run docker build -t registry.datexis.com/jwesterhoff/multi-imprinting:latest . --platform=linux/amd64
-# - to push, run docker push registry.datexis.com/jwesterhoff/multi-imprinting:latest
+# - to build, run docker build -t registry.datexis.com/jwesterhoff/imprinting:latest . --platform=linux/amd64
+# - to push, run docker push registry.datexis.com/jwesterhoff/imprinting:latest
 # - to set the above secret keys and have them available in python env, do, e.g.,
 #   `kubectl create secret generic kaggle-key --from-literal=KAGGLE_KEY='123'
 # - tqdm and k9s: Run `kubectl attach <pod-name>` to see the progress of the job

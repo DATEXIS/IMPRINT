@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="multi-imprinting",
+    name="imprinting",
     version="0.1.0",
     packages=find_packages(),
     description="Code for paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'",
