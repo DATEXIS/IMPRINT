@@ -259,14 +259,14 @@ device_name = "cpu"
 
 max_number_of_jobs = 48  # Set this higher than the expected number of data combinations
 # Machine requirements per job
-cpu_request = 8
+cpu_request = 16
 cpu_limit = 16
 parallel_threads = (
     1  # >1 currently does not seem to work (at least not with all data; not even with half of it)
 )
 torch_threads = int(cpu_request / parallel_threads)
 # NOTE: use htop on the pod to check the CPU utilization
-memory_request = "8Gi"
+memory_request = "16Gi"
 memory_limit = "16Gi"
 use_cache = True  # shared memory stuff
 shared_memory_limit = "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
