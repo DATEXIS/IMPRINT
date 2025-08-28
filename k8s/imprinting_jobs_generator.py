@@ -170,7 +170,7 @@ def generate_jobs(
         task_splits = exp_combo["task_splits"]
 
         # Generate app_name from components
-        app_name = f"{results_dir}"
+        app_name = "impr"
         app_name = app_name + f"-{app_name_suffix}"
         app_name = app_name + "-overw" if overwrite_json_files else app_name
 
@@ -224,10 +224,10 @@ def generate_jobs(
 
 
 ### Configuration #############################################################
-results_dir = "reprod"  # Will be used for results_dir and in dir name of generated jobs
+results_dir = "reprod_subsec1_with_timings_and_more_agg"  # Will be used for results_dir and in dir name of generated jobs
 # app_name_suffix = "fig6"
-# app_name_suffix = "subsec1"
-app_name_suffix = "subsec1kls"
+app_name_suffix = "subsec1"
+# app_name_suffix = "subsec1kls"
 # app_name_suffix = "subsec2"
 # app_name_suffix = "subsec2kls"
 # app_name_suffix = "subsec3-imagenet"
@@ -237,8 +237,8 @@ app_name_suffix = "subsec1kls"
 # app_name_suffix = "subsec3-combdigits"
 # app_name_suffix = "subsec3-combdig-kls"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
-# config_path = "src/config/config_reprod_subsec1.yaml"
-config_path = "src/config/config_reprod_subsec1_kls.yaml"
+config_path = "src/config/config_reprod_subsec1.yaml"
+# config_path = "src/config/config_reprod_subsec1_kls.yaml"
 # config_path = "src/config/config_reprod_subsec2.yaml"
 # config_path = "src/config/config_reprod_subsec2_kls.yaml"
 # config_path = "src/config/config_reprod_subsec3_imagenet.yaml"
@@ -270,7 +270,10 @@ memory_request = "8Gi"
 memory_limit = "16Gi"
 use_cache = True  # shared memory stuff
 shared_memory_limit = "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
-gpu_node_selector = None
+gpu_node_selector = [
+    "v100"
+]  # Target V100 nodes specifically for better reproducability and especially timing comparison
+# gpu_node_selector = []
 
 ### End Configuration #########################################################
 

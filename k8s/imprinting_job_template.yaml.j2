@@ -14,7 +14,7 @@ spec:
       priorityClassName: normal
       containers:
         - name: imprinting
-          image: registry.datexis.com/jwesterhoff/imprinting:latest
+          image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
           command: ["python", "scripts/run_imprinting_experiments.py",
                     "--data_and_res_dir", "/app/imprinting-reproduce",
                     "--results_dir", "{{ results_dir }}",
@@ -61,6 +61,10 @@ spec:
             limits:
               cpu: "{{ cpu_limit}}"
               memory: "{{ memory_limit }}"
+      {% if gpu_node_selector and gpu_node_selector|length > 0 %}
+      nodeSelector:
+        gpu: {{ gpu_node_selector[0] }}
+      {% endif %}
 {% elif device_name == 'cuda' %}
           resources:
             requests:
