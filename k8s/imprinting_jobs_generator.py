@@ -227,6 +227,7 @@ def generate_jobs(
 results_dir = "reprod"  # Will be used for results_dir and in dir name of generated jobs
 # app_name_suffix = "fig6"
 # app_name_suffix = "subsec1"
+app_name_suffix = "subsec1kls"
 # app_name_suffix = "subsec2"
 # app_name_suffix = "subsec2kls"
 # app_name_suffix = "subsec3-imagenet"
@@ -234,9 +235,10 @@ results_dir = "reprod"  # Will be used for results_dir and in dir name of genera
 # app_name_suffix = "subsec3-nimagenet"
 # app_name_suffix = "subsec3-nimagenetkls"
 # app_name_suffix = "subsec3-combdigits"
-app_name_suffix = "subsec3-combdig-kls"
+# app_name_suffix = "subsec3-combdig-kls"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
 # config_path = "src/config/config_reprod_subsec1.yaml"
+config_path = "src/config/config_reprod_subsec1_kls.yaml"
 # config_path = "src/config/config_reprod_subsec2.yaml"
 # config_path = "src/config/config_reprod_subsec2_kls.yaml"
 # config_path = "src/config/config_reprod_subsec3_imagenet.yaml"
@@ -244,7 +246,7 @@ app_name_suffix = "subsec3-combdig-kls"
 # config_path = "src/config/config_reprod_subsec3_non-imagenet.yaml"
 # config_path = "src/config/config_reprod_subsec3_non-imagenet_kls.yaml"
 # config_path = "src/config/config_reprod_subsec3_combidigits.yaml"
-config_path = "src/config/config_reprod_subsec3_combidigits_kls.yaml"
+# config_path = "src/config/config_reprod_subsec3_combidigits_kls.yaml"
 
 clear_existing_jobs = True
 use_wandb = False
@@ -255,7 +257,7 @@ save_train_acc = False  # Whether to save training accuracy in the result JSON f
 
 device_name = "cpu"
 
-max_number_of_jobs = 10  # Set this higher than the expected number of data combinations
+max_number_of_jobs = 48  # Set this higher than the expected number of data combinations
 # Machine requirements per job
 cpu_request = 8
 cpu_limit = 16

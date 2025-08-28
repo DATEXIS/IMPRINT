@@ -41,13 +41,19 @@ python scripts/run_imprinting_experiments.py --config src/config/config_reprod_s
 ```
 
 ### Docker and Kubernetes Setup
-Build a Docker container via
+To run this across a Linux cluster with Kubernetes for large-scale parallel execution, build a Docker container via
 
 ```bash
-docker build -t imprinting .
+docker build -t imprinting . --platform=linux/amd64
 ```
 
-and then, for large-scale parallel execution, use (for example) the Kubernetes job generator:
+push it to your desired registry via
+
+```bash
+docker push <registry-name>/imprinting
+```
+
+and then, use (for example) the Kubernetes job generator:
 
 ```bash
 # Navigate to the k8s directory
