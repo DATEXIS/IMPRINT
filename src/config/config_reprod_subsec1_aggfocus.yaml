@@ -36,26 +36,17 @@
         "kmeans",
         "kmedoids",
         "mean",
-        "ls",
-        "kls",
-        "cov_max",
-        "random",
-        "fps",
         "all"
     ],
     "ks": [
         -1,
         1,
-        2,
-        3,
         5,
-        10,
         20
     ],
     "normalize_weights": [
         "none",
         "l2",
-        "quantile"
     ],
     "aggregation_methods": [
         "max",
