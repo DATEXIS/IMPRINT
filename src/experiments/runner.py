@@ -355,7 +355,10 @@ def run_combination(
         f"(presampling_fewshot_value={combination['presampling_fewshot_value']}, "
         f"proxy_method={combination['proxy_method']}, "
         f"k={combination['k']}, "
-        f"aggreg_method={combination['aggregation_method']})"
+        f"aggreg_method={combination['aggregation_method']}, "
+        f"aggreg_dist={combination['aggregation_distance_function']}, "
+        f"aggreg_weight={combination['aggregation_weighting']}, "
+        f"m={combination['m']}"
     )
 
     # Configure thread usage for torch operations
@@ -386,8 +389,8 @@ def run_combination(
             allow_val_change=True,
         )
 
-    # Start timing for the current combination
-    start_time = time.time()
+    # Start timing for the current combination (use perf_counter for better precision)
+    start_time = time.perf_counter()
 
     # Gradient tracking is not needed since we're not using SGD
     torch.set_grad_enabled(False)
@@ -397,6 +400,8 @@ def run_combination(
         normalize_input_data=combination["normalize_input_data"],
         normalize_weights=combination["normalize_weights"],
         aggregation_method=combination["aggregation_method"],
+        aggregation_distance_function=combination["aggregation_distance_function"],
+        aggregation_weighting=combination["aggregation_weighting"],
         m=combination["m"],
         embedding_size=embedding_size,
     ).to(device)
@@ -568,7 +573,7 @@ def run_combination(
         if save_train_acc:
             train_accs.append(model.accuracy(train_data, train_labels_mapped))
 
-        elapsed_time = time.time() - start_time
+        elapsed_time = time.perf_counter() - start_time
         print(
             f"\t\t[INFO] Accuracy on task {task_idx+1} ({task_desc}): "
             f"{accs[task_idx]:.2f}%; {elapsed_time:.3f}s runtime"
@@ -601,7 +606,10 @@ def run_combination(
     combination["label_mapping_desc"] = label_mapping_desc
     combination["task_split"] = continual_loader.task_splits[0]
     combination["task_desc"] = " & ".join(map(str, continual_loader.task_splits[0]))
-    combination["runtime"] = elapsed_time
+
+    # Calculate final runtime (covers all tasks processed)
+    final_runtime = time.perf_counter() - start_time
+    combination["runtime"] = final_runtime
     combination["created_at"] = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 
     # Calculate metrics across all tasks if multiple tasks were processed
@@ -610,6 +618,12 @@ def run_combination(
         final_tasks_f1s = model.f1_scores(test_data_accum, test_labels_mapped_accum)
         combination["final_tasks_acc"] = final_tasks_acc
         combination["final_tasks_f1s"] = final_tasks_f1s
+
+        # Print final results
+        print(
+            f"\t\t[INFO] Final accuracy on data of all tasks: "
+            f"{final_tasks_acc:.2f}%; {final_runtime:.2f}s total runtime"
+        )
 
         # Log final results to wandb
         if use_wandb:
@@ -623,13 +637,6 @@ def run_combination(
                     "final_tasks_f1_weight_avg": final_weighted_f1,
                 }
             )
-
-        # Print final results
-        elapsed_time = time.time() - start_time
-        print(
-            f"\t\t[INFO] Final accuracy on data of all tasks: "
-            f"{final_tasks_acc:.2f}%; {elapsed_time:.2f}s total runtime"
-        )
 
     # Save results to JSON file
     with open(os.path.join(res_dir, f"{_id}.json"), "w") as json_file:

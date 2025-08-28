@@ -37,6 +37,12 @@
     "aggregation_methods": [
         "max",
     ],
+    "aggregation_distance_functions": [
+        "inner_product",
+    ],
+    "aggregation_weightings": [
+        "uniform",
+    ],
     "ms": [
         -1,
     ]

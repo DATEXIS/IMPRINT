@@ -30,6 +30,8 @@ class ImprintedModel(nn.Module):
         normalize_input_data: str = "l2",
         normalize_weights: str = "l2",
         aggregation_method: str = "mean",
+        aggregation_distance_function: str = "inner_product",
+        aggregation_weighting: str = "uniform",
         m: int = 5,  # for m-nearest neighbors
         embedding_size: int = 512,
     ):
@@ -42,6 +44,15 @@ class ImprintedModel(nn.Module):
                               ("none", "l2", "quantile")
             aggregation_method: Method for aggregating activations
                                ("max", "mnn")
+            aggregation_distance_function: Distance function for aggregation
+                ("inner_product", "cosine", "euclidean", "manhattan", "mahalanobis", "chebyshev")
+                Note: For "max" + "inner_product", uses original activation-based max
+                Note: For "max" + other distances, redirects to "mnn" with m=1
+                Note: For "mnn", "inner_product" does not make sense, as that
+                      is not a distance; it is simply mapped to "cosine"
+            aggregation_weighting: Weighting scheme for aggregation
+                ("uniform", "weighted_by_distance")
+                Note: For "max" and m=1, weighting is irrelevant
             m: Number of nearest neighbors for mNN aggregation
             embedding_size: Size of the feature embeddings
         """
@@ -51,6 +62,8 @@ class ImprintedModel(nn.Module):
         self.normalize_input_data = normalize_input_data
         self.normalize_weights = normalize_weights
         self.aggregation_method = aggregation_method
+        self.aggregation_distance_function = aggregation_distance_function
+        self.aggregation_weighting = aggregation_weighting
         self.m = m
 
         self.w1s = nn.ParameterList()
@@ -67,11 +80,7 @@ class ImprintedModel(nn.Module):
         # Initialize empty weight parameters for new classes
         self.w1s.extend(
             num_class_extension
-            * [
-                torch.zeros(
-                    (0, self.embedding_size), dtype=torch.float32, requires_grad=False
-                )
-            ]
+            * [torch.zeros((0, self.embedding_size), dtype=torch.float32, requires_grad=False)]
         )
 
     @torch.no_grad()
@@ -98,12 +107,32 @@ class ImprintedModel(nn.Module):
         """
         data = self.normalize(data, "input_data")
 
-        # Apply layer
-        w1 = torch.vstack([*self.w1s])
-        x = w1 @ data.T
+        if self.aggregation_method == "mnn":
+            # Direct mNN aggregation - no activations needed
+            y = self.mnn_aggregation(data)
+        elif self.aggregation_method == "max":
+            if self.aggregation_distance_function == "inner_product":
+                # Classic max inner product - compute activations and take max directly
+                w1 = torch.vstack([*self.w1s])
+                x = w1 @ data.T
 
-        # Aggregate activations using the specified method
-        y = self.aggregate_activations(x, data)
+                y = torch.zeros((self.num_classes, x.shape[-1]), device=data.device)
+                lens = [len(w1) for w1 in self.w1s]
+                start = 0
+
+                for class_idx in range(self.num_classes):
+                    end = start + lens[class_idx]
+                    class_activations = x[start:end]
+                    y[class_idx, :] = class_activations.max(dim=0).values
+                    start = end
+            else:
+                # For any other distance function, max aggregation is equivalent to 1-NN
+                original_m = self.m
+                self.m = 1
+                y = self.mnn_aggregation(data)
+                self.m = original_m  # restore original m
+        else:
+            raise ValueError(f"Unknown aggregation method: {self.aggregation_method}")
 
         return y
 
@@ -151,46 +180,6 @@ class ImprintedModel(nn.Module):
 
         return data
 
-    def aggregate_activations(self, activations, data):
-        """
-        Aggregate activations using the specified method.
-        Note that, if the aggregation method is "mnn", only the provided
-        data is used; the layer activations are not used. This also
-        means the layer activations are irrelevant to the mnn aggregation.
-
-        Args:
-            activations: Layer activations to aggregate
-            data: Original input data (used for mNN aggregation)
-
-        Returns:
-            torch.Tensor: Aggregated class scores
-
-        Raises:
-            ValueError: If unknown aggregation method is specified
-        """
-        y = torch.zeros((self.num_classes, activations.shape[-1]), device=data.device)
-
-        if self.aggregation_method == "mnn":
-            y = self.mnn_aggregation(data)
-        else:
-            lens = [len(w1) for w1 in self.w1s]
-            start = 0
-
-            for class_idx in range(self.num_classes):
-                end = start + lens[class_idx]
-                class_activations = activations[start:end]
-
-                if self.aggregation_method == "max":
-                    y[class_idx, :] = class_activations.max(dim=0).values
-                else:
-                    raise ValueError(
-                        f"Unknown aggregation method: {self.aggregation_method}"
-                    )
-
-                start = end
-
-        return y
-
     def mnn_aggregation(self, data):
         """
         Aggregate activations using m-Nearest Neighbors.
@@ -218,16 +207,36 @@ class ImprintedModel(nn.Module):
                 "aggregation instead."
             )
 
-        # Fit mNN on the class weights
-        mnn = NearestNeighbors(n_neighbors=m, algorithm="auto").fit(
-            all_class_weights_np
-        )
+        sklearn_metric = self.aggregation_distance_function
+        metric_params = {}
+
+        # Special handling for our custom names
+        if sklearn_metric == "inner_product":
+            sklearn_metric = "cosine"  # inner product maps to cosine, as
+            #  "inner_product" is not a metric
+        elif sklearn_metric == "mahalanobis":
+            # For sklearn's mahalanobis, we need to provide the inverse covariance matrix
+            if all_class_weights_np.shape[0] <= 1:
+                raise ValueError(
+                    "Mahalanobis distance requires at least 2 weight vectors to compute covariance matrix"
+                )
+
+            # Compute covariance matrix from weight vectors
+            weights_centered = all_class_weights_np - np.mean(
+                all_class_weights_np, axis=0, keepdims=True
+            )
+            cov = np.cov(weights_centered.T) + np.eye(all_class_weights_np.shape[1]) * 1e-6
+            inv_cov = np.linalg.inv(cov)
+            metric_params = {"VI": inv_cov}
+
+        # Fit mNN on the class weights with the specified distance metric
+        mnn = NearestNeighbors(
+            n_neighbors=m, metric=sklearn_metric, algorithm="auto", metric_params=metric_params
+        ).fit(all_class_weights_np)
         distances, indices = mnn.kneighbors(data_np)
 
         # Get the number of proxies per class
-        num_proxies_per_class = [
-            len(self.w1s[class_idx]) for class_idx in range(self.num_classes)
-        ]
+        num_proxies_per_class = [len(self.w1s[class_idx]) for class_idx in range(self.num_classes)]
         cumulative_num_proxies = [0] + list(
             torch.cumsum(torch.tensor(num_proxies_per_class), dim=0).numpy()
         )
@@ -250,17 +259,25 @@ class ImprintedModel(nn.Module):
             dtype=torch.int64,
         )
 
-        # Weighted majority voting using inverse distances
+        # Weighted majority voting using the specified weighting scheme
+        #  (uniform or using inverse distances)
         distances = torch.tensor(distances)
-        predicted_labels = torch.tensor(
-            [
-                mnn_labels[_i]
-                .bincount(weights=1 / (distances[_i] + 1e-10))
-                .argmax()
-                .item()
-                for _i in range(len(data_np))
-            ]
-        )
+
+        if self.aggregation_weighting == "uniform":
+            # Simple majority voting (each neighbor gets equal weight)
+            predicted_labels = torch.tensor(
+                [mnn_labels[_i].bincount().argmax().item() for _i in range(len(data_np))]
+            )
+        elif self.aggregation_weighting == "weighted_by_distance":
+            # Distance-weighted voting (closer neighbors get higher weight)
+            predicted_labels = torch.tensor(
+                [
+                    mnn_labels[_i].bincount(weights=1 / (distances[_i] + 1e-10)).argmax().item()
+                    for _i in range(len(data_np))
+                ]
+            )
+        else:
+            raise ValueError(f"Unknown aggregation weighting for mNN: {self.aggregation_weighting}")
 
         # Create one-hot encoding for predictions
         y = torch.zeros((self.num_classes, data.shape[0]), device=data.device)
@@ -319,11 +336,7 @@ class ImprintedModel(nn.Module):
 
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = (
-                2 * precision * recall / (precision + recall)
-                if (precision + recall) > 0
-                else 0.0
-            )
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
             f1_scores["remapped_class_index"].append(remppd_cl_idx)
             f1_scores["one-vs-rest-f1"].append(f1 * 100)
             f1_scores["class_size"].append(class_size)

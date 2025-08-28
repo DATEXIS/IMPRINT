@@ -41,18 +41,16 @@ def generate_combinations(
     # Extract parameters from config
     seeds = config.get("seeds", [17121997, 123987, 12412312])
     normalize_input_data = config.get("normalize_input_data", ["l2"])
-    normalize_for_proxy_selection = config.get(
-        "normalize_for_proxy_selection", ["none"]
-    )
+    normalize_for_proxy_selection = config.get("normalize_for_proxy_selection", ["none"])
     presampling_methods = config.get("presampling_methods", ["all"])
-    presampling_quantiles_values = config.get(
-        "presampling_quantiles_values", [(0, 1.0)]
-    )
+    presampling_quantiles_values = config.get("presampling_quantiles_values", [(0, 1.0)])
     presampling_fewshot_values = config.get("presampling_fewshot_values", [-1])
     proxy_methods = config.get("proxy_methods", ["lmeans"])
     ks = config.get("ks", [20])
     normalize_weights = config.get("normalize_weights", ["l2"])
     aggregation_methods = config.get("aggregation_methods", ["max"])
+    aggregation_distance_functions = config.get("aggregation_distance_functions", ["inner_product"])
+    aggregation_weightings = config.get("aggregation_weightings", ["uniform"])
     ms = config.get("ms", [-1])
 
     # Set up all the configurations
@@ -74,6 +72,8 @@ def generate_combinations(
                 "k": ks,
                 "normalize_weights": normalize_weights,
                 "aggregation_method": aggregation_methods,
+                "aggregation_distance_function": aggregation_distance_functions,
+                "aggregation_weighting": aggregation_weightings,
                 "m": ms,
             }
         )
@@ -98,9 +98,9 @@ def generate_combinations(
     )
 
     # Expand the filtered DataFrame for each seed
-    filtered_df_expanded = filtered_df.loc[
-        filtered_df.index.repeat(len(seeds))
-    ].reset_index(drop=True)
+    filtered_df_expanded = filtered_df.loc[filtered_df.index.repeat(len(seeds))].reset_index(
+        drop=True
+    )
 
     # Add the `seed` column
     seeds_repeated = seeds * len(filtered_df)
@@ -109,9 +109,7 @@ def generate_combinations(
     )
 
     # Sort columns in alphabetical order for consistent hashing
-    filtered_df_expanded = filtered_df_expanded[
-        sorted(filtered_df_expanded.columns, reverse=False)
-    ]
+    filtered_df_expanded = filtered_df_expanded[sorted(filtered_df_expanded.columns, reverse=False)]
 
     # Convert to list of dictionaries
     final_configurations = filtered_df_expanded.to_dict(orient="records")
@@ -132,11 +130,25 @@ def filter_combinations(df):
     Returns:
         DataFrame: Filtered configurations
     """
-    # "max" aggregation is independent of m; the m is only for mNN
+    # "max" aggregation is independent of m; the m is only for mNN.
+    # Also, for max aggregation, weighting doesn't matter:
+    # - inner_product: only take the max anyway
+    # - other distances: redirect to mNN with m=1, so only one neighbor
+    #   (no weighting effect here as well)
     df.loc[df["aggregation_method"] == "max", "m"] = -1
+    df.loc[df["aggregation_method"] == "max", "aggregation_weighting"] = "uniform"
 
-    # Remove rows where m is -1 for "mnn" aggregation
+    # Remove rows where m is -1 for "mnn" aggregation, because that does
+    #  not make sense and is reserved for "max"
     df = df[~((df["aggregation_method"] == "mnn") & (df["m"] == -1))]
+
+    # For mnn, "inner_product" does not make sense, as that is not a distance
+    df = df[
+        ~(
+            (df["aggregation_method"] == "mnn")
+            & (df["aggregation_distance_function"] == "inner_product")
+        )
+    ]
 
     # The m cannot be greater than the number of proxies
     df.loc[(df["m"] > df["k"]) & (df["k"] > 0), "m"] = df["k"]
@@ -148,10 +160,7 @@ def filter_combinations(df):
 
     # Presampling only makes sense if not everything is taken
     df = df[
-        ~(
-            (df["presampling_method"] == "weibull")
-            & (df["presampling_quantiles_value"] == (0, 1.0))
-        )
+        ~((df["presampling_method"] == "weibull") & (df["presampling_quantiles_value"] == (0, 1.0)))
     ]
 
     # "mean" and "ls" proxy method can only choose one proxy
@@ -175,8 +184,7 @@ def filter_combinations(df):
     # k can not be greater than selected few shots (or rather, if that happened,
     #  then these runs are the same)
     df.loc[
-        (df["presampling_fewshot_value"] != -1)
-        & (df["presampling_fewshot_value"] < df["k"]),
+        (df["presampling_fewshot_value"] != -1) & (df["presampling_fewshot_value"] < df["k"]),
         "k",
     ] = df["presampling_fewshot_value"]
 
