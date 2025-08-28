@@ -48,6 +48,17 @@
         "max",
         "mnn"
     ],
+    "aggregation_distance_functions": [
+        "inner_product",
+        "cosine",
+        "euclidean",
+        "manhattan",
+        "mahalanobis",
+    ],
+    "aggregation_weightings": [
+        "uniform",
+        "weighted_by_distance"
+    ],
     "ms": [
         -1,
         1,
