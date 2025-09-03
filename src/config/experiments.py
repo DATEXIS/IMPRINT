@@ -150,8 +150,9 @@ def filter_combinations(df):
         )
     ]
 
-    # The m cannot be greater than the number of proxies
-    df.loc[(df["m"] > df["k"]) & (df["k"] > 0), "m"] = df["k"]
+    # The m cannot be greater than the total number of proxies (since we always
+    #  have 10 classes, we put *10 here). Ignore these.
+    df = df[~((df["m"] > df["k"] * 10) & (df["k"] > 0))]
 
     # "all" presampling is independent of quantile
     df.loc[df["presampling_method"] == "all", "presampling_quantiles_value"] = df.loc[

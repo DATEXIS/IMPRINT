@@ -198,12 +198,13 @@ class ImprintedModel(nn.Module):
         all_class_weights_np = w1.numpy()
         data_np = data.cpu().numpy()
 
-        # Ensure k is not greater than the number of class weights
+        # Ensure m is not greater than the total number of class weights
+        #  (all_class_weights_np.shape[0] == k * number of classes (usually 10))
         m = min(all_class_weights_np.shape[0], self.m)
         if m != self.m:
             print(
-                f"Warning: m was set to {self.m}, but only {m} "
-                f"class weights are available. Using k={m} for mnn "
+                f"Warning: m was initially set to {self.m}, but in total only {m} "
+                f"class weights are available. Hence, using k={m} for mnn "
                 "aggregation instead."
             )
 
