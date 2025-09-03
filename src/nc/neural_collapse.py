@@ -69,12 +69,8 @@ class NeuralCollapse:
 
             # Calculate normalized centered class mean
             norm = torch.norm(self.centered_class_mean[idx, :], p=2, keepdim=True)
-            eps = torch.finfo(
-                self.centered_class_mean.dtype
-            ).eps  # For numerical stability
-            self.centered_class_mean_norm[idx, :] = self.centered_class_mean[
-                idx, :
-            ] / (norm + eps)
+            eps = torch.finfo(self.centered_class_mean.dtype).eps  # For numerical stability
+            self.centered_class_mean_norm[idx, :] = self.centered_class_mean[idx, :] / (norm + eps)
 
     def covariance(self):
         """
@@ -106,16 +102,12 @@ class NeuralCollapse:
             centered_class_data = class_samples - self.centered_class_mean[idx, :]
 
             # Calculate covariance matrix for this class
-            intra_class_covariance[idx] = (
-                centered_class_data.T @ centered_class_data
-            ) / max(
+            intra_class_covariance[idx] = (centered_class_data.T @ centered_class_data) / max(
                 1, len(centered_class_data)
             )  # Avoid division by zero
 
         # Calculate inter-class covariance
-        inter_class_covariance = (
-            self.centered_class_mean.T @ self.centered_class_mean
-        ) / max(
+        inter_class_covariance = (self.centered_class_mean.T @ self.centered_class_mean) / max(
             1, n_classes
         )  # Avoid division by zero
 
@@ -123,14 +115,18 @@ class NeuralCollapse:
 
     def nc_1(self, intra_m=None, inter_m=None):
         """
-        Calculate Neural Collapse metric NC1.
+        Calculate Neural Collapse metrics around NC1.
 
-        NC1 measures the ratio of within-class variability to between-class
-        variability, calculated as:
-        NC1 = Tr(Σ_W × Σ_B⁻¹)/C
+        As defined in [1], NC1 measures the ratio of within-class variability
+        to between-class variability, calculated as:
+            `NC1 = Tr(Σ_W × (Σ_B)⁻¹)/C`
 
         where Σ_W is the average within-class covariance, Σ_B is the
         between-class covariance, and C is the number of classes.
+
+        Let Σ_T = Σ_B+Σ_W be the overall covariance matrix, then
+            `VCI = 1 - (Tr(Σ_B × (Σ_T)⁻¹))/rank(Σ_B)`
+        is the Variability Collapse Index as defined in [2].
 
         Lower values indicate stronger Neural Collapse (more separation
         between classes relative to within-class variance).
@@ -142,7 +138,11 @@ class NeuralCollapse:
                      will be calculated.
 
         Returns:
-            float: The NC1 metric value
+            tuple[float]: NC1, VCI, trace of intra-class covariance, trace of inter-class covariance,
+                          intra-class rank, inter-class rank.
+
+        [1] A Geometric Analysis of Neural Collapse with Unconstrained Features
+        [2] Quantifying the Variability Collapse of Neural Networks
         """
         # Calculate covariance matrices if not provided
         if intra_m is None or inter_m is None:
@@ -150,7 +150,7 @@ class NeuralCollapse:
 
         # Handle case of empty classes or singular matrices
         if torch.all(torch.isclose(inter_m, torch.zeros_like(inter_m))):
-            return float("inf")
+            return float("inf"), float("inf"), 0.0, 0.0, 0, 0
 
         # Calculate average intra-class covariance
         avg_intra_m = intra_m.mean(dim=0)
@@ -158,8 +158,18 @@ class NeuralCollapse:
         # Use pseudoinverse for numerical stability
         pseudo_inv_inter = torch.linalg.pinv(inter_m)
 
-        # Calculate NC1 metric
+        # Calculate NC1 metrics
         nc_1_matrix = pseudo_inv_inter @ avg_intra_m
         nc_1_value = torch.trace(nc_1_matrix).item() / len(self.unique_labels)
 
-        return nc_1_value
+        # VCI
+        pseudo_inv_overall = torch.linalg.pinv(avg_intra_m + inter_m)
+        vci = 1 - (
+            torch.trace(inter_m @ pseudo_inv_overall).item() / torch.linalg.matrix_rank(inter_m).item()
+        )
+
+        # Calculate ranks
+        intra_rank = torch.linalg.matrix_rank(avg_intra_m).item()
+        inter_rank = torch.linalg.matrix_rank(inter_m).item()
+
+        return nc_1_value, vci, torch.trace(avg_intra_m).item(), torch.trace(inter_m).item(), intra_rank, inter_rank

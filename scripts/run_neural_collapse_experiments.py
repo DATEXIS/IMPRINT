@@ -67,6 +67,11 @@ def process_standard_datasets(parameters, root, nc_dir):
         "dataset": [],
         "backbone": [],
         "nc_1": [],
+        "vci": [],
+        "intra_trace": [],
+        "inter_trace": [],
+        "intra_rank": [],
+        "inter_rank": [],
     }
 
     # Process each combination
@@ -96,22 +101,34 @@ def process_standard_datasets(parameters, root, nc_dir):
                 embeddings = embeddings[wanted_labels]
                 labels = labels[wanted_labels]
 
-            # Apply normalizationl
+            # Apply normalization
             embeddings = embeddings / (
                 torch.norm(embeddings, dim=1, keepdim=True) + torch.finfo(embeddings.dtype).eps
             )
 
             # Calculate neural collapse metrics
-            print(f"Calculating NC1 for {dataset_name} with {backbone}")
+            print(f"Calculating NC1s for {dataset_name} with {backbone}")
             nc = NeuralCollapse(embeddings, labels)
-            nc_1 = nc.nc_1()  # Let nc_1 calculate covariance internally
+            nc_1, vci, intra_trace, inter_trace, intra_rank, inter_rank = (
+                nc.nc_1()
+            )  # Let nc_1 calculate covariance internally
 
             # Store results
             results["dataset"].append(dataset_name)
             results["backbone"].append(backbone)
             results["nc_1"].append(nc_1)
+            results["vci"].append(vci)
+            results["intra_trace"].append(intra_trace)
+            results["inter_trace"].append(inter_trace)
+            results["intra_rank"].append(intra_rank)
+            results["inter_rank"].append(inter_rank)
 
-            print(f"Completed {dataset_name} with {backbone}: NC1 = {nc_1:.4f}")
+            print(
+                f"Completed {dataset_name} with {backbone}: NC1 = {nc_1:.4f}, "
+                f"VCI = {vci:.4f}, Intra-trace = {intra_trace:.4f}, "
+                f"Inter-trace = {inter_trace:.4f}, Intra-rank = {intra_rank}, "
+                f"Inter-rank = {inter_rank}"
+            )
 
         except Exception as e:
             print(f"Error processing {dataset_name} with {backbone}: {str(e)}")
@@ -125,12 +142,16 @@ def process_standard_datasets(parameters, root, nc_dir):
 
     # Print a summary table
     print("\nNeural Collapse (NC1) Results Summary for Standard Datasets:")
-    print("=" * 50)
-    print(f"{'Dataset':<15} {'Backbone':<15} {'NC1':<10}")
-    print("-" * 50)
+    print("=" * 80)
+    print(
+        f"{'Dataset':<15} {'Backbone':<15} {'NC1':<10} {'VCI':<10} {'Intra-trace':<15} {'Inter-trace':<15} {'Intra-rank':<12} {'Inter-rank':<12}"
+    )
+    print("-" * 80)
     for i in range(len(results["dataset"])):
         print(
             f"{results['dataset'][i]:<15} {results['backbone'][i]:<15} {results['nc_1'][i]:<10.4f}"
+            f" {results['vci'][i]:<10.4f} {results['intra_trace'][i]:<15.4f} {results['inter_trace'][i]:<15.4f}"
+            f" {results['intra_rank'][i]:<12} {results['inter_rank'][i]:<12}"
         )
 
 
@@ -153,6 +174,11 @@ def process_imagenet_with_remapping(root, nc_dir):
         "n_classes_per_label": [],
         "remapping_index": [],
         "nc_1": [],
+        "vci": [],
+        "intra_trace": [],
+        "inter_trace": [],
+        "intra_rank": [],
+        "inter_rank": [],
     }
 
     # Process each backbone
@@ -203,8 +229,13 @@ def process_imagenet_with_remapping(root, nc_dir):
                     )
 
                     # Calculate neural collapse metrics
+                    print(
+                        f"  Calculating NC1s for ImageNet with {backbone}, remapping {remapping_name}"
+                    )
                     nc = NeuralCollapse(embeddings, labels)
-                    nc_1 = nc.nc_1()  # Let nc_1 calculate covariance internally
+                    nc_1, vci, intra_trace, inter_trace, intra_rank, inter_rank = (
+                        nc.nc_1()
+                    )  # Let nc_1 calculate covariance internally
 
                     # Store results
                     imagenet_results["dataset"].append("ImageNet")
@@ -213,8 +244,18 @@ def process_imagenet_with_remapping(root, nc_dir):
                     imagenet_results["n_classes_per_label"].append(n_classes_per_label)
                     imagenet_results["remapping_index"].append(remapping_idx)
                     imagenet_results["nc_1"].append(nc_1)
+                    imagenet_results["vci"].append(vci)
+                    imagenet_results["intra_trace"].append(intra_trace)
+                    imagenet_results["inter_trace"].append(inter_trace)
+                    imagenet_results["intra_rank"].append(intra_rank)
+                    imagenet_results["inter_rank"].append(inter_rank)
 
-                    print(f"  Completed remapping {remapping_name}: NC1 = {nc_1:.4f}")
+                    print(
+                        f"  Completed remapping {remapping_name}: NC1 = {nc_1:.4f}"
+                        f", VCI = {vci:.4f}, Intra-trace = {intra_trace:.4f}, "
+                        f"Inter-trace = {inter_trace:.4f}, Intra-rank = {intra_rank}, "
+                        f"Inter-rank = {inter_rank}"
+                    )
 
                 except Exception as e:
                     print(
