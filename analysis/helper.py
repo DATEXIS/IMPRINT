@@ -43,6 +43,8 @@ HYPERPARAMS = [
     "k",
     ###
     "aggregation_method",
+    "aggregation_distance_function",
+    "aggregation_weighting",
     "m",
 ]
 
@@ -61,6 +63,8 @@ ABBREVS = {
     "proxy_method": "prxy_meth",
     "k": "k",
     "aggregation_method": "agg_meth",
+    "aggregation_distance_function": "agg_dist",
+    "aggregation_weighting": "agg_weig",
     "m": "m",
     "sgd_finetuning": "sgd",
     ### VALUES:
@@ -96,7 +100,7 @@ def save_wandb_to_csv(data: list[dict], start_time="", finish_time="", filename=
 
 
 def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
-    """Fetches data from wandb and saves it to CSV."""
+    """Fetches data from wandb and saves it to CSV. NOTE: Outdated."""
     # Login to wandb if needed
     wandb.login()
 
@@ -215,6 +219,8 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         "k",
         ###
         "aggregation_method",
+        "aggregation_distance_function",  # Not necessarily existing, checked below
+        "aggregation_weighting",  # Not necessarily existing, checked below
         "m",
         ###
         "seed",
