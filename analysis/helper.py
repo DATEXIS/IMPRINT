@@ -229,6 +229,7 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         "task_train_acc",  # Not necessarily existing, checked below
         "task_f1s",
         "runtime",
+        "total_GEN_time",  # Not necessarily existing, checked below
         ###
         "created_at",
     ]
@@ -281,6 +282,10 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
     # Only if "task_train_acc" is present, we can slice it out
     if "task_train_acc" not in df.columns:
         keys.remove("task_train_acc")
+
+    # Only if "total_GEN_time" is present, we can slice it out
+    if "total_GEN_time" not in df.columns:
+        keys.remove("total_GEN_time")
 
     # Slice out the keys we are interested in
     df = df[keys]

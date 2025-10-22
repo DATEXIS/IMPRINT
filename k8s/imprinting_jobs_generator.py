@@ -224,12 +224,12 @@ def generate_jobs(
 
 
 ### Configuration #############################################################
-results_dir = "reprod_subsec1_with_timings_and_more_agg"  # Will be used for results_dir and in dir name of generated jobs
+results_dir = "reprod_subsec1_with_GEN_timings_for_kmeans_and_kls"  # Will be used for results_dir and in dir name of generated jobs
 # app_name_suffix = "fig6"
 # app_name_suffix = "subsec1aggfix"
-# app_name_suffix = "subsec1aggfix-kls"
+app_name_suffix = "subsec1aggfix-kls"
 # app_name_suffix = "subsec1aggfoc"
-app_name_suffix = "subsec1aggfoc-kls"
+# app_name_suffix = "subsec1aggfoc-kls"
 # app_name_suffix = "subsec2"
 # app_name_suffix = "subsec2kls"
 # app_name_suffix = "subsec3-imagenet"
@@ -240,9 +240,9 @@ app_name_suffix = "subsec1aggfoc-kls"
 # app_name_suffix = "subsec3-combdig-kls"
 # config_path = "src/config/config_reprod_fig6.yaml"  # Use the YAML config file with backbones, datasets, task_splits and label_remappings
 # config_path = "src/config/config_reprod_subsec1_aggfixed.yaml"
-# config_path = "src/config/config_reprod_subsec1_aggfixed_kls.yaml"
+config_path = "src/config/config_reprod_subsec1_aggfixed_kls.yaml"
 # config_path = "src/config/config_reprod_subsec1_aggfocus.yaml"
-config_path = "src/config/config_reprod_subsec1_aggfocus_kls.yaml"
+# config_path = "src/config/config_reprod_subsec1_aggfocus_kls.yaml"
 # config_path = "src/config/config_reprod_subsec2.yaml"
 # config_path = "src/config/config_reprod_subsec2_kls.yaml"
 # config_path = "src/config/config_reprod_subsec3_imagenet.yaml"
@@ -275,8 +275,8 @@ memory_limit = "16Gi"
 use_cache = True  # shared memory stuff
 shared_memory_limit = "2Gi"  # easily suffices for everything except the big vgg11_bn embeddings
 gpu_node_selector = [
-    "b200"
-]  # Target B200 nodes specifically for better reproducability and especially timing comparison
+    "h200"
+]  # Target H200 nodes specifically for better reproducability and especially timing comparison
 # gpu_node_selector = []
 
 ### End Configuration #########################################################

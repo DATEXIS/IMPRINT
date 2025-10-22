@@ -120,7 +120,7 @@ def run_combinations(
     res_dir: str = "data/results",
     use_wandb: bool = True,
     parallel_threads: int = 1,
-    torch_threads: int = 2,
+    torch_threads: int = 8,
     use_cache: bool = False,
     device_name: str = "cpu",
     overwrite: bool = False,
@@ -158,6 +158,10 @@ def run_combinations(
 
     # Silence wandb
     os.environ["WANDB_SILENT"] = "true"
+
+    # Configure thread usage for torch operations
+    torch.set_num_threads(torch_threads)
+    torch.set_num_interop_threads(torch_threads)
 
     # Check combinations for validity (backbone, dataset, label_mapping and
     #  task_splits must be constant, because otherwise the previous data
@@ -216,8 +220,6 @@ def run_combinations(
                     embedding_size,
                     use_wandb,
                     res_dir,
-                    serial,
-                    torch_threads,
                     device,
                     overwrite,
                     save_train_acc,
@@ -234,8 +236,6 @@ def run_combinations(
                 embedding_size,
                 use_wandb,
                 res_dir,
-                serial,
-                torch_threads,
                 device,
                 overwrite,
                 save_train_acc,
@@ -256,8 +256,6 @@ def run_combination_with_progress(
     embedding_size,
     use_wandb,
     res_dir,
-    serial,
-    torch_threads,
     device,
     overwrite,
     save_train_acc,
@@ -277,8 +275,6 @@ def run_combination_with_progress(
         embedding_size,
         use_wandb,
         res_dir,
-        serial,
-        torch_threads,
         device,
         overwrite,
         save_train_acc,
@@ -300,8 +296,6 @@ def run_combination(
     embedding_size,
     use_wandb,
     res_dir,
-    serial,
-    torch_threads,
     device,
     overwrite,
     save_train_acc,
@@ -319,8 +313,6 @@ def run_combination(
         embedding_size: Size of feature embeddings
         use_wandb: Whether to log results to Weights & Biases
         res_dir: Directory to save results
-        serial: Whether execution is in serial mode
-        torch_threads: Number of threads for torch operations
         device: Device to use for computation
         overwrite: Whether to overwrite existing results
         save_train_acc: Whether to save training accuracy in results
@@ -360,10 +352,6 @@ def run_combination(
         f"aggreg_weight={combination['aggregation_weighting']}, "
         f"m={combination['m']}"
     )
-
-    # Configure thread usage for torch operations
-    if not serial:
-        torch.set_num_threads(torch_threads)
 
     # Find correct lambda regularization value
     lambda_reg = backbone_lambda_regs[combination["backbone_name"]]
@@ -411,6 +399,8 @@ def run_combination(
     f1s = []
     if save_train_acc:
         train_accs = []
+
+    generation_time_acc = 0
 
     # Process each task in the continual learning scenario
     for task_idx in range(continual_loader.num_tasks()):
@@ -465,15 +455,16 @@ def run_combination(
                 # Store the filtered data for this class
                 all_class_data[label] = filtered_task_data
 
-            # Time the least-squares computation
-            _start_time = time.time()
+            # Time the (k-)least-squares computation
+            _start_time = time.perf_counter()
 
             # Compute least-squares weights using all class data
             if combination["proxy_method"] == "ls":
                 ls_weights = compute_least_squares_weights(all_class_data, lambda_reg=lambda_reg)
+                generation_time = time.perf_counter() - _start_time
                 print(
                     f"\t\t[INFO] Least-squares weights computation for task {task_idx+1} "
-                    f"took {time.time() - _start_time:.2f}s."
+                    f"took {generation_time:.2f}s."
                 )
             elif combination["proxy_method"] == "kls":
                 ls_weights = compute_prototype_least_squares_weights(
@@ -482,10 +473,13 @@ def run_combination(
                     lambda_reg=lambda_reg,
                     seed=combination["seed"],
                 )
+                generation_time = time.perf_counter() - _start_time
                 print(
                     f"\t\t[INFO] Prototype least-squares weights computation for task "
-                    f"{task_idx+1} took {time.time() - _start_time:.2f}s."
+                    f"{task_idx+1} took {generation_time:.2f}s."
                 )
+
+            generation_time_acc += generation_time
 
             # Add the computed weights to the model
             for label, ls_weight in ls_weights.items():
@@ -516,7 +510,7 @@ def run_combination(
                 )
 
                 # Time proxy selection
-                _start_time = time.time()
+                _start_time = time.perf_counter()
 
                 # Select proxies from the filtered data
                 task_proxies = select_proxies(
@@ -525,12 +519,13 @@ def run_combination(
                     method=combination["proxy_method"],
                     seed=combination["seed"],
                 ).to(device)
-
+                generation_time = time.perf_counter() - _start_time
                 print(
                     f"\t\t[INFO] Proxy selection '{combination['proxy_method']}' "
                     f"for label {label} in task {task_idx+1} took "
-                    f"{time.time() - _start_time:.2f}s."
+                    f"{generation_time:.2f}s."
                 )
+                generation_time_acc += generation_time
 
                 # Extend model weights with the selected proxies
                 model.extend_ws(data=task_proxies, class_index=mapping[label])
@@ -611,6 +606,8 @@ def run_combination(
     final_runtime = time.perf_counter() - start_time
     combination["runtime"] = final_runtime
     combination["created_at"] = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    combination["total_GEN_time"] = generation_time_acc
+    print(f"\t\t\t[INFO] Total GEN time: {generation_time_acc:.3f}s")
 
     # Calculate metrics across all tasks if multiple tasks were processed
     if task_idx > 0:

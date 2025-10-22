@@ -41,6 +41,16 @@ spec:
             value: 'C.UTF-8'
           - name: PYTHONUNBUFFERED
             value: '1'
+          - name: OMP_NUM_THREADS
+            value: "{{ torch_threads }}" # limit OpenMP-based BLAS backends (OpenBLAS, MKL)
+          - name: MKL_NUM_THREADS
+            value: "{{ torch_threads }}" # explicit cap for MKL
+          - name: OPENBLAS_NUM_THREADS
+            value: "{{ torch_threads }}"
+          - name: VECLIB_MAXIMUM_THREADS
+            value: "{{ torch_threads }}"
+          - name: NUMEXPR_MAX_THREADS
+            value: "{{ torch_threads }}"
           - name: WANDB_API_KEY
             valueFrom:
               secretKeyRef:
