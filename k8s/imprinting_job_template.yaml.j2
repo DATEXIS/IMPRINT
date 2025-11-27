@@ -14,7 +14,7 @@ spec:
       priorityClassName: normal
       containers:
         - name: imprinting
-          image: registry.datexis.com/jwesterhoff/multi-imprinting:latest
+          image: registry.datexis.com/jwesterhoff/imprinting:latest
           command: ["python", "scripts/run_imprinting_experiments.py",
                     "--data_and_res_dir", "/app/imprinting-reproduce",
                     "--results_dir", "{{ results_dir }}",
