@@ -100,7 +100,7 @@ def save_wandb_to_csv(data: list[dict], start_time="", finish_time="", filename=
 
 
 def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
-    """Fetches data from wandb and saves it to CSV. NOTE: Outdated."""
+    """Fetches data from wandb and saves it to CSV. NOTE: OUTDATED."""
     # Login to wandb if needed
     wandb.login()
 
@@ -111,7 +111,7 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
     # Fetch runs
     api = wandb.Api(timeout=350)
 
-    # TODO: Load in parallel? for example, for each dataset_name
+    # (TODO): Load in parallel? for example, for each dataset_name
 
     filters = {
         "state": "finished",
@@ -159,12 +159,11 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
                 f"Fetching runs created at {_created_at} ({_counter} runs checked, "
                 f"{_num_saved_runs} runs saved (of which {_num_saved_sgd_runs} with SGD history))"
             )
-            # TODO: save latest created_at to be able to know from where to start again!
 
         config = run.config
         summary = run.summary
 
-        # TODO: add mapping stuff
+        # (TODO): add mapping stuff
 
         data.append(
             {
