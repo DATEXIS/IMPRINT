@@ -43,6 +43,8 @@ HYPERPARAMS = [
     "k",
     ###
     "aggregation_method",
+    "aggregation_distance_function",
+    "aggregation_weighting",
     "m",
 ]
 
@@ -61,6 +63,8 @@ ABBREVS = {
     "proxy_method": "prxy_meth",
     "k": "k",
     "aggregation_method": "agg_meth",
+    "aggregation_distance_function": "agg_dist",
+    "aggregation_weighting": "agg_weig",
     "m": "m",
     "sgd_finetuning": "sgd",
     ### VALUES:
@@ -96,7 +100,7 @@ def save_wandb_to_csv(data: list[dict], start_time="", finish_time="", filename=
 
 
 def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
-    """Fetches data from wandb and saves it to CSV."""
+    """Fetches data from wandb and saves it to CSV. NOTE: OUTDATED."""
     # Login to wandb if needed
     wandb.login()
 
@@ -107,7 +111,7 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
     # Fetch runs
     api = wandb.Api(timeout=350)
 
-    # TODO: Load in parallel? for example, for each dataset_name
+    # (TODO): Load in parallel? for example, for each dataset_name
 
     filters = {
         "state": "finished",
@@ -155,12 +159,11 @@ def fetch_data_from_wandb(start_time, last_full_fetch_until, ignore_data_after):
                 f"Fetching runs created at {_created_at} ({_counter} runs checked, "
                 f"{_num_saved_runs} runs saved (of which {_num_saved_sgd_runs} with SGD history))"
             )
-            # TODO: save latest created_at to be able to know from where to start again!
 
         config = run.config
         summary = run.summary
 
-        # TODO: add mapping stuff
+        # (TODO): add mapping stuff
 
         data.append(
             {
@@ -215,6 +218,8 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         "k",
         ###
         "aggregation_method",
+        "aggregation_distance_function",  # Not necessarily existing, checked below
+        "aggregation_weighting",  # Not necessarily existing, checked below
         "m",
         ###
         "seed",
@@ -223,6 +228,7 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
         "task_train_acc",  # Not necessarily existing, checked below
         "task_f1s",
         "runtime",
+        "total_GEN_time",  # Not necessarily existing, checked below
         ###
         "created_at",
     ]
@@ -275,6 +281,10 @@ def gather_data_from_jsons(raw_json_results_dir, ignore_data_before):
     # Only if "task_train_acc" is present, we can slice it out
     if "task_train_acc" not in df.columns:
         keys.remove("task_train_acc")
+
+    # Only if "total_GEN_time" is present, we can slice it out
+    if "total_GEN_time" not in df.columns:
+        keys.remove("total_GEN_time")
 
     # Slice out the keys we are interested in
     df = df[keys]

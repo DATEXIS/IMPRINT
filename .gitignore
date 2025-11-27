@@ -4,7 +4,7 @@ analysis/nc_results
 analysis/raw_results
 analysis/result_graphs
 analysis/result_tables
-k8s/generated_imprinting_jobs_reprod
+k8s/generated_imprinting_jobs_*
 data/results_temp
 data/results
 data/embeddings

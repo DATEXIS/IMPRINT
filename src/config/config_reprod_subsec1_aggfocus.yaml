@@ -16,37 +16,52 @@
         12412312
     ],
     "normalize_input_data": [
-        "none"
+        "none",
+        "l2"
     ],
     "normalize_for_proxy_selection": [
         "none",
+        "l2"
     ],
     "presampling_methods": [
-        "all"
+        "all",
     ],
     "presampling_quantiles_values": [
-        [0, 1.0]
+        [0, 1.0],
     ],
     "presampling_fewshot_values": [
-        -1
+        -1,
     ],
     "proxy_methods": [
-        "kls",
+        "kmeans",
+        "kmedoids",
+        "mean",
+        "all"
     ],
     "ks": [
+        -1,
         1,
-        2,
-        3,
         5,
-        10,
         20
     ],
     "normalize_weights": [
-        "none"
+        "none",
+        "l2",
     ],
     "aggregation_methods": [
         "max",
         "mnn"
+    ],
+    "aggregation_distance_functions": [
+        "inner_product",
+        "cosine",
+        "euclidean",
+        "manhattan",
+        "mahalanobis",
+    ],
+    "aggregation_weightings": [
+        "uniform",
+        "weighted_by_distance"
     ],
     "ms": [
         -1,

@@ -1,15 +1,15 @@
 # Robust Weight Imprinting
 This repository contains code for the paper **Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation**.
-[[Preprint](https://arxiv.org/abs/2503.14572)]
+[[Preprint](https://arxiv.org/abs/2503.14572)] [[TMLR Publication](https://www.google.com/search?q=TODO)]
 
 ## Overview of our `IMPRINT` Framework
 We test frozen, neurally collapsed foundation models (`FMs`) on transferability to new classes.
-The weight generator (`GEN`) uses training data from a novel task `T` to generate one or more weight vectors (proxies) per class $1, \dotsc, c$ given in `T`.
-The final output of the test data in `T` is computed by an aggregation (`AGG`) mechanism.
+The weight generator (`GEN`) uses training data from a novel task `T` to consecutively generate one or more weight vectors (proxies) per class $1, \dotsc, c$ in `T`.
+In inference, the final output for the test data in `T` is computed by an aggregation (`AGG`) mechanism.
 Embeddings and generated weights are normalized according to `NORMpre` and `NORMpost`, respectively.
-During inference, embeddings are normalized according to `NORMinf` (not shown here).
+During inference, embeddings are normalized according to `NORMinf`.
 
-<img src="docs/images/framework_overview.svg" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
+<img src="docs/images/framework_overview.png" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
 
 For more details on the framework implementation and components, please refer to the paper.
 
@@ -37,7 +37,7 @@ pip install -e .
 python scripts/generate_embeddings.py
 
 # Now you can run experiments, e.g., reproduce the results from the first results subsection
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1_aggfixed.yaml
 ```
 
 ### Docker and Kubernetes Setup
@@ -74,8 +74,11 @@ The jobs will run in parallel on your Kubernetes cluster, with results stored in
 To reproduce all the experiments from our paper, run the following configuration files using the `run_imprinting_experiments.py` script:
 
 ```bash
-# Section 5.1
-python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1.yaml
+# Section 5.1 (including Table 1)
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1_aggfixed.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1_aggfixed_kls.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1_aggfocus.yaml
+python scripts/run_imprinting_experiments.py --config src/config/config_reprod_subsec1_aggfocus_kls.yaml
 
 # Figure 6
 python scripts/run_imprinting_experiments.py --config src/config/config_reprod_fig6.yaml
@@ -99,13 +102,13 @@ python scripts/run_imprinting_experiments.py --config src/config/config_reprod_s
 
 ### Neural Collapse Experiments
 
-The neural collapse experiments provide insights into the benefits of multi-proxy imprinting and are shown in the third results subsection of the paper:
+The neural collapse experiments provide insights into the benefits of multi-proxy imprinting and are shown in the section 5.1 of the paper:
 
 ```bash
 python scripts/run_neural_collapse_experiments.py
 ```
 
-This script calculates the NC1 metric for MNIST, FashionMNIST, CIFAR10, the MNIST&MNIST-M&USPS&SVHN mixed set ("CombiDigits"), and ImageNet with different label remappings.
+This script calculates the NC1 metric for `MNIST`, `FashionMNIST`, `CIFAR-10`, the MNIST&MNIST-M&USPS&SVHN mixed set (`CombiDigits`), and `ImageNet` with different label remappings.
 
 ### Analysis and Visualization
 
@@ -119,7 +122,7 @@ cd analysis
 jupyter notebook analysis.ipynb
 ```
 
-The critical difference diagram generation in `cd_diag.py` performs statistical significance testing to compare different imprinting configurations across multiple datasets and backbones.
+The critical difference diagram generation in `cd_diag.py` performs statistical significance testing to compare different imprinting configurations across multiple datasets and backbones (see section 3.3 in the paper for detailed explanation).
 
 ## Results
 Within `IMPRINT`, we find the best method by investigating average rank, average accuracy, and statistical significance in ranking (dis-)agreements through critical difference diagrams with $p<0.05$.
@@ -127,17 +130,22 @@ The rankings are across four `FMs` (`resnet18`, `resnet50`, `vit_b_16`, and `swi
 
 ### Comparison to Previous Methods
 
-Previously studied imprinting strategies are special cases within our framework.
-The framework enables the creation of a novel configuration ("Ours") that outperforms previous work across `FMs` and `Ts`by a large margin with statistical significance.
-It uses multiple proxies per class. Here, $k=20$ is chosen.
+Previously studied imprinting strategies are special cases within `IMPRINT`.
+The framework enables the creation of a novel configuration ("Ours") that outperforms previous work across `FMs` and `Ts` by a large margin with statistical significance.
+Here, $k=20$ is used, highlighting the gain of using multiple proxies per class.
+For reference, the gray row reports the oracle method that uses cross-class feature statistics to generate weights (see appendix A.5 in the paper).
+ It is not an imprinting method and therefore not directly comparable to the imprinting-based approaches above.
+Nonetheless, the results indicate that our method substantially narrows the gap between single-proxy `mean` imprinting and this oracle baseline.
 
-| Paper                                                                                                            | `NORMpre` | `GEN`   | `NORMpost` | `NORMinf` | `AGG` | Avg. acc. % |
-| ---------------------------------------------------------------------------------------------------------------- | --------- | ------- | ---------- | --------- | ----- | ----------- |
-| [Qi et al.](https://openaccess.thecvf.com/content_cvpr_2018/html/Qi_Low-Shot_Learning_With_CVPR_2018_paper.html) | L2        | mean    | L2         | L2        | max   | 85.75       |
-| [Hosoda et al.](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2024.1344114/full)      | none      | mean    | quantile   | none      | max   | 84.22       |
-| [Janson et al.](https://arxiv.org/abs/2210.04428)                                                                | none      | mean    | none       | none      | 1-nn  | 85.59       |
-| **Ours**                                                                                                         | L2        | k-means | L2         | L2        | max   | **91.11**   |
 
+| Paper                                                                                                            | `NORMpre` | `GEN`         | `NORMpost` | `NORMinf` | `AGG` | Avg. acc. % |
+| ---------------------------------------------------------------------------------------------------------------- | --------- | ------------- | ---------- | --------- | ----- | ----------- |
+| [Qi et al.](https://openaccess.thecvf.com/content_cvpr_2018/html/Qi_Low-Shot_Learning_With_CVPR_2018_paper.html) | L2        | mean          | L2         | L2        | max   | 86.79       |
+| [Hosoda et al.](https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2024.1344114/full)      | none      | mean          | quantile   | none      | max   | 82.90       |
+| [Janson et al.](https://arxiv.org/abs/2210.04428)                                                                | none      | mean          | none       | none      | 1-nn  | 86.64       |
+| **Ours**                                                                                                         | L2        | k-means       | L2         | L2        | max   | **91.06**   |
+|                                                                                                                  |
+| Oracle                                                                                                           | none      | least-squares | none       | none      | max   | 94.54       |
 
 ### Connection to Neural Collapse
 
@@ -145,5 +153,6 @@ The central effect of using multi-proxy imprinting with $k$-means becomes clear 
 In all four plots, peaks in accuracy at $k=d$ can be inferred.
 Accuracies of the tasks containing all of `MNIST`, `FashionMNIST`, `CIFAR-10`, resp. `CombiDigits` at once are shown in dotted lines and show that using one proxy (the `mean`) is not optimal, as the `FM` seems to not be fully collapsed on these OOD classes.
 This confirms the connection between the effect of using multiple proxies and the collapse of the data.
+In the paper, especially in Figure 12, this is explored further.
 
-<img src="docs/images/var_num_proxies_vs_datasets_kmeans.svg" alt="Effect of multi-proxy imprinting on different datasets as presented in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="600">
+<img src="docs/images/var_num_proxies_vs_datasets_kmeans_Qi.svg" alt="Effect of multi-proxy imprinting on different datasets as presented in Figure 11b in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="500">
