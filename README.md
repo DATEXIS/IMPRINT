@@ -9,7 +9,7 @@ In inference, the final output for the test data in `T` is computed by an aggreg
 Embeddings and generated weights are normalized according to `NORMpre` and `NORMpost`, respectively.
 During inference, embeddings are normalized according to `NORMinf`.
 
-<img src="docs/images/framework_overview.svg" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
+<img src="docs/images/framework_overview.png" alt="Overview of the Framework used in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="800">
 
 For more details on the framework implementation and components, please refer to the paper.
 
