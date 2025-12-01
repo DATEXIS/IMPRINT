@@ -1,6 +1,6 @@
 # Robust Weight Imprinting
 This repository contains code for the paper **Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation**.
-[[Preprint](https://arxiv.org/abs/2503.14572)] [[TMLR Publication](https://www.google.com/search?q=TODO)]
+[[Preprint](https://arxiv.org/abs/2503.14572)] [[TMLR Publication](https://www.google.com/search?q=TODO)] [[Project Page](https://www.google.com/search?q=TODO)] [[Video Presentation](https://www.google.com/search?q=TODO)]
 
 ## Overview of our `IMPRINT` Framework
 We test frozen, neurally collapsed foundation models (`FMs`) on transferability to new classes.
