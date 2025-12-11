@@ -1,6 +1,6 @@
 # Robust Weight Imprinting
 This repository contains code for the paper **Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation**.
-[[Preprint](https://arxiv.org/abs/2503.14572)] [[TMLR Publication](https://www.google.com/search?q=TODO)] [[Video Presentation](https://youtu.be/d5cMBYjOAdQ)]
+[[Preprint](https://arxiv.org/abs/2503.14572)] [[TMLR Publication](https://openreview.net/forum?id=duU11BnQ3Y)] [[Video Presentation](https://youtu.be/d5cMBYjOAdQ)]
 
 ## Overview of our `IMPRINT` Framework
 We test frozen, neurally collapsed foundation models (`FMs`) on transferability to new classes.
@@ -156,3 +156,19 @@ This confirms the connection between the effect of using multiple proxies and th
 In the paper, especially in Figure 12, this is explored further.
 
 <img src="docs/images/var_num_proxies_vs_datasets_kmeans_Qi.svg" alt="Effect of multi-proxy imprinting on different datasets as presented in Figure 11b in the paper 'Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation'" width="500">
+
+## Citation
+
+If you find this work and/or repository useful for your research, please consider citing our paper:
+
+```bibtex
+@article{
+    westerhoff2025robust,
+    title={Robust Weight Imprinting: Insights from Neural Collapse and Proxy-Based Aggregation},
+    author={Justus Westerhoff and Golzar Atefi and Mario Koddenbrock and Alexei Figueroa and Alexander L{\"o}ser and Erik Rodner and Felix Alexander Gers},
+    journal={Transactions on Machine Learning Research},
+    issn={2835-8856},
+    year={2025},
+    url={https://openreview.net/forum?id=duU11BnQ3Y},
+}
+```
